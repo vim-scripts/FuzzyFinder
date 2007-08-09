@@ -1,8 +1,8 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " fuzzyfinder.vim : Buffer and file explorer with the fuzzy pattern
-" Last Change:  08-Aug-2007.
+" Last Change:  09-Aug-2007.
 " Author:       Takeshi Nishida <ns9tks(at)ns9tks.net>
-" Version:      0.1, for Vim 7.0
+" Version:      0.2, for Vim 7.0
 " Licence:      MIT Licence
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -30,8 +30,8 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Installation:
 "     Drop this file in your plugin directory.  If you have installed
-"     autocomplpop.vim(), please update to the latest version to prevent
-"     interference.
+"     autocomplpop.vim (vimscript #1879), please update to the latest version
+"     to prevent interference.
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Usage:
@@ -69,7 +69,14 @@
 "     See a section setting global value below.
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Thanks:
+"     Vincent Wang
+"
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " ChangeLog:
+"     0.2:
+"         A bug it does not work on Linux is fixed.
+"
 "     0.1:
 "         First release.
 "
@@ -166,14 +173,16 @@ function! <SID>OpenInputWindow(isBufferMode)
 
     if s:bufID != -1
         " a buffer already created
-        execute('buffer ' . s:bufID)
+        execute 'buffer ' . s:bufID
         delete _
     else
         1new
         let s:bufID = bufnr('%')
 
         " suspend autocomplpop.vim
-        if exists(':AutoComplPopLock') | :AutoComplPopLock | endif
+        if exists(':AutoComplPopLock')
+            :AutoComplPopLock
+        endif
 
         " global setting
         let s:_completeopt = &completeopt
@@ -191,7 +200,7 @@ function! <SID>OpenInputWindow(isBufferMode)
         " mapping
         inoremap <buffer> <silent> <expr> <CR> <SID>OnCR()
         inoremap <buffer> <silent> <expr> <BS> pumvisible() ? "\<C-E>\<BS>" : "\<BS>"
-        execute("inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleMode . " <SID>ToggleMode()")
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleMode . " <SID>ToggleMode()"
 
         " auto command
         augroup FuzzyFinder_AutoCommand
@@ -205,7 +214,7 @@ function! <SID>OpenInputWindow(isBufferMode)
 
     let &l:completefunc = completeFunc
 
-    execute('file ' . bufferName)
+    execute 'file ' . bufferName
 
     " start insert mode. ">" makes CursorMovedI event now and forces a
     " completion menu to update every typing.
@@ -237,7 +246,9 @@ function! FuzzyFinder_CompleteBuffer(findstart, base)
     let pattern = <SID>MakeFuzzyPattern(l:base, 1)
 
     " make a list of buffers
-    redir => l:lines | silent buffers! | redir END
+    redir => l:lines
+    silent buffers!
+    redir END
 
     let res = []
     for line in split(lines, "\n")
@@ -314,10 +325,10 @@ endfunction
 function! <SID>OnCursorMovedI()
     " Fix
     if line('.') != 1 
-        call feedkeys("\<Esc>:e " . getline('1') . "\<CR>", 'n')
+        let fn = (getline('1') =~ '^>' ? getline('1')[1:] : getline('1'))
+        call feedkeys("\<Esc>:e " . fn . "\<CR>", 'n')
         return
-    endif
-    if getline('.') !~ '^>'
+    elseif getline('.') !~ '^>'
         call feedkeys("\<Home>>\<End>", 'n')
         return
     endif
@@ -349,7 +360,9 @@ endfunction
 
 function! <SID>OnBufLeave()
     " resume autocomplpop.vim
-    if exists(':AutoComplPopUnlock') | :AutoComplPopUnlock | endif
+    if exists(':AutoComplPopUnlock')
+        :AutoComplPopUnlock
+    endif
 
     let &completeopt = s:_completeopt
     let &wildignore  = s:_wildignore
