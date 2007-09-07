@@ -1,8 +1,8 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " fuzzyfinder.vim : Buffer and file explorer with the fuzzy pattern
-" Last Change:  11-Aug-2007.
+" Last Change:  07-Sep-2007.
 " Author:       Takeshi Nishida <ns9tks(at)ns9tks.net>
-" Version:      0.3, for Vim 7.0
+" Version:      0.4, for Vim 7.0
 " Licence:      MIT Licence
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -79,15 +79,27 @@
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " ChangeLog:
+"     0.4:
+"         - Improved response of the input.
+"         - Improved the sorting algorithm for completion items. It is based
+"           on the matching level. 1st is perfect matching, 2nd is prefix
+"           matching, and 3rd is fuzzy matching.
+"         - Added g:FuzzyFinder_ExcludePattern option.
+"         - Removed g:FuzzyFinder_WildIgnore option.
+"         - Removed g:FuzzyFinder_EchoPattern option.
+"         - Removed g:FuzzyFinder_PathSeparator option.
+"         - Changed the default value of g:FuzzyFinder_MinLengthFile from 1 to
+"           0.
+"
 "     0.3:
 "         - Added g:FuzzyFinder_IgnoreCase option.
 "         - Added g:FuzzyFinder_KeyToggleIgnoreCase option.
 "         - Added g:FuzzyFinder_EchoPattern option.
 "         - Changed the open command in a buffer mode from ":edit" to
-"         ":buffer" to avoid being reset cursor position.
+"           ":buffer" to avoid being reset cursor position.
 "         - Changed the default value of g:FuzzyFinder_KeyToggleMode from
-"         <C-Space> to <F12> because <C-Space> does not work on some CUI
-"         environments.
+"           <C-Space> to <F12> because <C-Space> does not work on some CUI
+"           environments.
 "         - Changed to avoid being loaded by Vim before 7.0.
 "         - Fixed a bug with making a fuzzy pattern which has '\'.
 "
@@ -117,11 +129,6 @@ if !exists('g:FuzzyFinder_KeyToggleIgnoreCase')
     let g:FuzzyFinder_KeyToggleIgnoreCase = '<F11>'
 endif
 
-" Path separator.
-if !exists('g:FuzzyFinder_PathSeparator')
-    let g:FuzzyFinder_PathSeparator = (has('win32') ? '\' : '/')
-endif
-
 " In buffer mode, do not complete if a length of inputting is less than this.
 if !exists('g:FuzzyFinder_MinLengthBuffer')
     let g:FuzzyFinder_MinLengthBuffer = 0
@@ -129,7 +136,7 @@ endif
 
 " In file mode, do not complete if a length of inputting is less than this.
 if !exists('g:FuzzyFinder_MinLengthFile')
-    let g:FuzzyFinder_MinLengthFile = 1
+    let g:FuzzyFinder_MinLengthFile = 0
 endif
 
 " In buffer and file mode, ignore case in search patterns.
@@ -137,22 +144,15 @@ if !exists('g:FuzzyFinder_IgnoreCase')
     let g:FuzzyFinder_IgnoreCase = &ignorecase
 endif
 
-" In file mode, set this to 'wildignore'
-if !exists('g:FuzzyFinder_WildIgnore')
-    let g:FuzzyFinder_WildIgnore = '*~,*.bak'
+" In file mode, files which matchs this are ignored.
+if !exists('g:FuzzyFinder_ExcludePattern')
+    let g:FuzzyFinder_ExcludePattern = '^\.$\|\.bak$\|\~$\|\.swp$'
 endif
 
-" In buffer mode, buffers with an indicator matching this are ignored
+" In buffer mode, buffers with an indicator matching this are ignored.
 if !exists('g:FuzzyFinder_ExcludeIndicator')
     let g:FuzzyFinder_ExcludeIndicator = '[u\-]'
 endif
-
-" Echo the fuzzy pattern which is converted from the pattern what you are
-" typing.
-if !exists('g:FuzzyFinder_EchoPattern')
-    let g:FuzzyFinder_EchoPattern = 0
-endif
-
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -162,8 +162,9 @@ command! -narg=0 -bar FuzzyFinderFile   call <SID>StartFileMode()
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+let s:pathSeparator = has('win32') ? '\' : '/'
 let s:cmdPrompt = '>'
-let s:bufID = -1
+let s:bufNr = -1
 let s:isLastModeBuffer = 0
 let s:openCommand = 0
 let s:reserveToggleMode = 0
@@ -218,13 +219,13 @@ function! <SID>OpenInputWindow(isBufferMode)
     let s:isLastModeBuffer = a:isBufferMode
     let s:lastInputLength = -1
 
-    if s:bufID != -1
+    if s:bufNr != -1
         " a buffer already created
-        execute 'buffer ' . s:bufID
+        execute 'buffer ' . s:bufNr
         delete _
     else
         1new
-        let s:bufID = bufnr('%')
+        let s:bufNr = bufnr('%')
 
         " suspend autocomplpop.vim
         if exists(':AutoComplPopLock')
@@ -236,8 +237,6 @@ function! <SID>OpenInputWindow(isBufferMode)
         set completeopt=menuone
         let s:_ignorecase = &ignorecase
         let &ignorecase = g:FuzzyFinder_IgnoreCase
-        let s:_wildignore = &wildignore
-        let &wildignore = g:FuzzyFinder_WildIgnore
 
         " local setting
         setlocal bufhidden=wipe
@@ -297,80 +296,63 @@ function! FuzzyFinder_CompleteBuffer(findstart, base)
     silent buffers!
     redir END
 
-    let res = []
+    let result = []
     for line in split(lines, "\n")
         " bufInfo[1]: number,   bufInfo[2]: indicator,   bufInfo[3]: filename
         let bufInfo = matchlist(line, '^\s*\(\d*\)\s*\([^"]*\)\s*"\([^"]*\)"')
-        let bufAbbr = (bufInfo[2] =~ 'a' ? '*' : ' ')
 
-        if bufInfo[1] == s:bufID || bufInfo[2] =~ g:FuzzyFinder_ExcludeIndicator
+        if bufInfo[1] == s:bufNr || bufInfo[2] =~ g:FuzzyFinder_ExcludeIndicator || 
+                    \ (bufInfo[1] != input[1] && bufInfo[3] !~ patternR)
             continue
-        elseif bufInfo[1] == input[1] || bufInfo[3] == input[1]
-            call insert(res, {'word': bufInfo[3], 'abbr': bufAbbr, 'menu': line})
-        elseif bufInfo[3] =~ patternR
-            call    add(res, {'word': bufInfo[3], 'abbr': bufAbbr, 'menu': line})
         endif
+
+        call add(result, <SID>MakeCompletionItemWithMatchingLevel(bufInfo[3], bufInfo[1], line, input[1]))
     endfor
 
-    if g:FuzzyFinder_EchoPattern
-        echo "pattern:" . patternW
-    endif
+    call sort(result, "<SID>SortByMatchingLevel")
 
-    call feedkeys(!empty(res) ? "\<C-P>\<Down>" : "\<C-E>", 'n')
+    call feedkeys(!empty(result) ? "\<C-P>\<Down>" : "\<C-E>", 'n')
 
-    return res
+    echo "pattern:" . patternW
+
+    return result
 endfunction
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 function! FuzzyFinder_CompleteFile(findstart, base)
-    if a:findstart 
+    if a:findstart
         return 0
     endif
 
     let input = <SID>ExtractPromptedInput(a:base)
-    let pathHead = matchstr(input[1], '^.*[/\\]')
-    let pathTail = input[1][strlen(pathHead):]
+    let pathPair = <SID>SplitPath(input[1])
 
-    if !input[0] || strlen(pathTail) < g:FuzzyFinder_MinLengthFile
+    if !input[0] || strlen(pathPair[1]) < g:FuzzyFinder_MinLengthFile
         echo ""
         return []
     endif
 
-    let patternW = pathHead . <SID>MakeFuzzyPattern(pathTail)
-    let patternR = <SID>ConvertWildcardToRegexp(patternW)
-    if &ignorecase  && !has('win32')
-        let patternW = <SID>ExpandCase(patternW)
-    endif
+    let patternW = pathPair[0] . <SID>MakeFuzzyPattern(pathPair[1])
 
+    echo 'Making file list...'
+    let result = <SID>GlobEx(patternW)
+    echo 'Evaluating...'
+    call map (result, '<SID>MakeCompletionItemWithMatchingLevel(v:val, -1, v:val, input[1])')
+    call sort(result, '<SID>SortByMatchingLevel')
 
-    let res = []
-    for path in split(glob(patternW), "\n")
-        if isdirectory(path)
-            let path = path . g:FuzzyFinder_PathSeparator
-        endif
-        if path == input[1]
-            call insert(res, {'word': path, 'menu': '| ' . fnamemodify(path, ':p')})
-        elseif &ignorecase || path =~ patternR
-            call    add(res, {'word': path, 'menu': '| ' . fnamemodify(path, ':p')})
-        endif
-    endfor
+    call feedkeys(!empty(result) ? "\<C-P>\<Down>" : "\<C-E>", 'n')
 
-    if g:FuzzyFinder_EchoPattern
-        echo "pattern:" . patternW
-    endif
+    echo 'pattern:' . patternW
 
-    call feedkeys(!empty(res) ? "\<C-P>\<Down>" : "\<C-E>", 'n')
-
-    return res
+    return result
 endfunction
-
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 function! <SID>OnCR()
-    return pumvisible() ? "\<C-Y>\<C-R>=col('.') > strlen(getline('.')) && getline('.') !~ '[\\\\/]$' ? \"\\<CR>\" : \"\"\<CR>" : "\<CR>"
+    return pumvisible() ? "\<C-Y>\<C-R>=col('.') > strlen(getline('.')) && getline('.') !~ '[/\\\\]$' ? \"\\<CR>\" : \"\"\<CR>" : "\<CR>"
 endfunction
 
 
@@ -419,10 +401,11 @@ function! <SID>OnBufLeave()
         :AutoComplPopUnlock
     endif
 
+    call <SID>ClearGlobExCache()
+
     let &completeopt = s:_completeopt
     let &ignorecase  = s:_ignorecase
-    let &wildignore  = s:_wildignore
-    let s:bufID = -1
+    let s:bufNr = -1
 
     quit " Quit when other window clicked without leaving a insert mode.
 endfunction
@@ -491,3 +474,100 @@ endfunction
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! <SID>SplitPath(path)
+    let dir = matchstr(a:path, '^.*[/\\]')
+    return [dir, a:path[strlen(dir):]]
+endfunction
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+
+function! <SID>GlobEx(patternW)
+    let patternWHead = <SID>SplitPath(a:patternW)[0]
+    let patternR = <SID>ConvertWildcardToRegexp(a:patternW)
+
+    if !exists('s:globExCacheDir') || s:globExCacheDir != patternWHead
+        let s:globExCacheDir = patternWHead
+
+        let dirList = split(expand(patternWHead), "\n")
+        if len(dirList) <= 1
+            " Do not expand here
+            let dirList = [patternWHead]
+        endif
+
+        for dir in dirList
+            let expDir = expand(dir)
+            let s:globExCache = split(glob(expDir . '.*') . "\n" . glob(expDir . '*' ), "\n")
+            call map   (s:globExCache, '<SID>SplitPath(v:val)[1]')
+            call filter(s:globExCache, 'v:val !~ g:FuzzyFinder_ExcludePattern')
+            call map   (s:globExCache, 'dir . v:val . (isdirectory(expDir . v:val) ? s:pathSeparator : "")')
+        endfor
+    endif
+
+    return filter(copy(s:globExCache), 'v:val =~ patternR')
+endfunction
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! <SID>ClearGlobExCache()
+    unlet! s:globExCacheDir
+    unlet! s:globExCache
+endfunction
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! <SID>ShellEscapeEx(path)
+    return a:path =~ '\s' ? shellescape(a:path) : a:path
+endfunction
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! <SID>MakeCompletionItemWithMatchingLevel(path, bufNr, abbr, input)
+    let pathTail  = <SID>SplitPath(matchstr(a:path , '^.*[^/\\]'))[1]
+    let inputTail = <SID>SplitPath(matchstr(a:input, '^.*[^/\\]'))[1]
+
+    " Evaluates matching level
+    if a:bufNr >= 0 && a:bufNr == a:input
+        let mlevel = strlen(inputTail) + 3
+    elseif a:path == a:input
+        let mlevel = strlen(inputTail) + 2
+    elseif pathTail == inputTail
+        let mlevel = strlen(inputTail) + 1
+    else
+        let mlevel = 0
+        while mlevel < strlen(inputTail) && pathTail[mlevel] == inputTail[mlevel]
+            let mlevel += 1
+        endwhile
+    endif
+
+    return      { 'word'  : a:path,
+                \ 'abbr'  : a:abbr,
+                \ 'menu'  : '| ' . repeat('*', mlevel),
+                \ 'mlevel': mlevel}
+endfunction
+
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+function! <SID>SortByMatchingLevel(i1, i2)
+    if     a:i1['mlevel'] < a:i2['mlevel']
+        return +1
+    elseif a:i1['mlevel'] > a:i2['mlevel']
+        return -1
+    elseif a:i1['word'] > a:i2['word']
+        return +1
+    elseif a:i1['word'] < a:i2['word']
+        return -1
+    endif
+    return 0
+endfunction
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
