@@ -1,11 +1,11 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " fuzzyfinder.vim : Buffer and file explorer with the fuzzy pattern
-" Last Change:  12-Sep-2007.
+" Last Change:  13-Sep-2007.
 " Author:       Takeshi Nishida <ns9tks(at)ns9tks.net>
-" Version:      0.5, for Vim 7.0
+" Version:      0.6, for Vim 7.0
 " Licence:      MIT Licence
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " Description:
 "     With fuzzyfinder, you can quickly reach the buffer or file you want with
 "     less typing. Fuzzyfinder find matching files or buffers with the fuzzy
@@ -27,13 +27,13 @@
 "
 "     Fuzzyfinder supports multibyte.
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " Installation:
 "     Drop this file in your plugin directory.  If you have installed
 "     autocomplpop.vim (vimscript #1879), please update to the latest version
 "     to prevent interference.
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " Usage:
 "     :FuzzyFinderBuffer opens a small window for a buffer explorer.
 "     :FuzzyFinderFile opens a small window for a file explorer.
@@ -71,18 +71,20 @@
 "     To cancel and return to previous window, leave a insert mode.
 "
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " Options:
 "     See a section setting global value below.
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " Thanks:
 "     Vincent Wang
 "     Ingo Karkat
 "     Nikolay Golubev
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 " ChangeLog:
+"     0.6:
+"         - Fixed some bugs.
 "     0.5:
 "         - Improved response by aborting processing too many items.
 "         - Changed to be able to open a buffer/file not only in previous
@@ -121,7 +123,7 @@
 "     0.1:
 "         - First release.
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"-----------------------------------------------------------------------------
 
 if exists('loaded_fuzzyfinder') || v:version < 700
     finish
@@ -130,6 +132,7 @@ let loaded_fuzzyfinder = 1
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" OPTIONS
 
 " Map this to select completion item or to finish input and open a
 " buffer/file. 1st item is mapped to open in previous window. 2nd item is
@@ -150,7 +153,8 @@ if !exists('g:FuzzyFinder_KeyToggleIgnoreCase')
     let g:FuzzyFinder_KeyToggleIgnoreCase = '<F11>'
 endif
 
-" If items were matched over this, processing completion is aborted. 
+" If items were matched over this, processing completion is aborted. If 0 was
+" set, it is not limited.
 if !exists('g:FuzzyFinder_CompletionItemLimit')
     let g:FuzzyFinder_CompletionItemLimit = 400
 endif
@@ -182,133 +186,19 @@ endif
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" COMMANDS
 
-command! -narg=0 -bar FuzzyFinderBuffer call <SID>StartBufferMode()
-command! -narg=0 -bar FuzzyFinderFile   call <SID>StartFileMode()
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" constants
-
-let s:pathSeparator = has('win32') ? '\' : '/'
-let s:prompt = '>'
-let s:abortedResult = [{'word': ' ', 'abbr': 'ABORT: Too many matches (> g:FuzzyFinder_CompletionItemLimit)'}]
+command! -narg=0 -bar FuzzyFinderBuffer call <SID>OpenInputWindow(s:modeBuffer)
+command! -narg=0 -bar FuzzyFinderFile   call <SID>OpenInputWindow(s:modeFile)
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" FUNCTIONS
 
-function! <SID>OnCR(in)
-    return (pumvisible() ? "\<C-Y>" : "") . "\<C-R>=" . <SID>GetSIDPrefix() . "OpenItem('" . a:in . "'," . pumvisible() . ")\<CR>"
-endfunction
+"-----------------------------------------------------------------------------
+function! <SID>OpenInputWindow(mode)
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OnBS()
-    return pumvisible() ? "\<C-E>\<BS>" : "\<BS>"
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OnCursorMovedI()
-    if !<SID>ExistsPrompt(getline('.'))
-        " a command prompt is removed
-        call setline('.', s:prompt . getline('.'))
-        call feedkeys(repeat("\<Right>", len(s:prompt)), 'n')
-        return
-    elseif col('.') <= len(s:prompt)
-        call feedkeys(repeat("\<Right>", len(s:prompt) - col('.') + 1), 'n')
-        return
-    endif
-
-    let deltaInputLength  = strlen(getline('.')) - s:lastInputLength
-    let s:lastInputLength = strlen(getline('.'))
-
-    " if the line was changed and cursor is placed on the end of the line
-    if deltaInputLength != 0 && col('.') > s:lastInputLength
-        call feedkeys("\<C-X>\<C-U>", 'n')
-    endif
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OnInsertLeave()
-    if exists('s:reserveToggleMode')
-        unlet s:reserveToggleMode
-        call <SID>OpenInputWindow(!s:isLastModeBuffer)
-    else
-        quit
-    endif
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OnBufLeave()
-    " resume autocomplpop.vim
-    if exists(':AutoComplPopUnlock')
-        :AutoComplPopUnlock
-    endif
-
-    call <SID>ClearGlobExCache()
-
-    let &completeopt = s:_completeopt
-    let &ignorecase  = s:_ignorecase
-    unlet s:bufNr
-
-    quit " Quit when other window clicked without leaving a insert mode.
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>StartBufferMode()
-    call <SID>OpenInputWindow(1)
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>StartFileMode()
-    call <SID>OpenInputWindow(0)
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>ToggleMode()
-    let s:reserveToggleMode = 1
-    return "\<ESC>"
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>ToggleIgnoreCase()
-    let &ignorecase = !&ignorecase
-    echo "ignorecase=" . &ignorecase
-    return ""
-endfunction
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OpenInputWindow(isBufferMode)
-
-    " differences between modes
-    if a:isBufferMode
-        let cmdOpen  = [':buffer ', ':sbuffer ', ':vertical :sbuffer ']
-        let bufferName = '[FuzzyFinder - Buffer]'
-        let completeFunc = <SID>GetSIDPrefix() . 'CompleteBuffer'
-    else
-        let cmdOpen  = [':edit ', ':split ', ':vsplit ']
-        let bufferName = '[FuzzyFinder - File]'
-        let completeFunc = <SID>GetSIDPrefix() . 'CompleteFile'
-    endif
-
-    let s:isLastModeBuffer = a:isBufferMode
+    let s:modeCurrent = a:mode
     let s:lastInputLength = -1
 
     if exists('s:bufNr')
@@ -326,7 +216,7 @@ function! <SID>OpenInputWindow(isBufferMode)
 
         " global setting
         let s:_completeopt = &completeopt
-        set completeopt=menuone
+        let &completeopt = 'menuone'
         let s:_ignorecase = &ignorecase
         let &ignorecase = g:FuzzyFinder_IgnoreCase
 
@@ -337,27 +227,27 @@ function! <SID>OpenInputWindow(isBufferMode)
         setlocal nobuflisted
         setlocal modifiable
 
-        " mapping
-        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleMode       . " <SID>ToggleMode()"
-        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleIgnoreCase . " <SID>ToggleIgnoreCase()"
-        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[0]          . " <SID>OnCR('" . cmdOpen[0] . "')"
-        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[1]          . " <SID>OnCR('" . cmdOpen[1] . "')"
-        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[2]          . " <SID>OnCR('" . cmdOpen[2] . "')"
-        execute "inoremap <buffer> <silent> <expr> " . "<BS>"                            . " <SID>OnBS()"
-
         " auto command
         augroup FuzzyFinder_AutoCommand
             autocmd!
-            autocmd InsertLeave  <buffer> nested call <SID>OnInsertLeave()
             autocmd CursorMovedI <buffer>        call <SID>OnCursorMovedI()
+            autocmd InsertLeave  <buffer> nested call <SID>OnInsertLeave()
             autocmd BufLeave     <buffer>        call <SID>OnBufLeave()
         augroup END
 
+        " mapping
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleMode       . " <SID>OnToggleMode()"
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyToggleIgnoreCase . " <SID>OnToggleIgnoreCase()"
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[0]          . " <SID>OnCR(0)"
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[1]          . " <SID>OnCR(1)"
+        execute "inoremap <buffer> <silent> <expr> " . g:FuzzyFinder_KeyOpen[2]          . " <SID>OnCR(2)"
+        execute "inoremap <buffer> <silent> <expr> " . "<BS>"                            . " <SID>OnBS()"
+
     endif
 
-    let &l:completefunc = completeFunc
+    let &l:completefunc = s:vars[a:mode].completeFunc
 
-    execute 'file ' . bufferName
+    execute 'file ' . s:vars[a:mode].bufferName
 
     " start insert mode. s:prompt makes CursorMovedI event now
     " and forces a completion menu to update every typing.
@@ -365,20 +255,17 @@ function! <SID>OpenInputWindow(isBufferMode)
 
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-function! <SID>OpenItem(cmdOpen, checkDir)
+"-----------------------------------------------------------------------------
+function! <SID>GetCmdOpenItem(index, checkDir)
     if a:checkDir && getline('.') =~ '[/\\]$'
         return ""
     endif
 
-    return "\<Esc>" . a:cmdOpen . (<SID>ExistsPrompt(getline('.')) ? getline('.')[strlen(s:prompt):] : getline('.')) . "\<CR>"
+    let item = <SID>ExistsPrompt(getline('.')) ? getline('.')[strlen(s:prompt):] : getline('.')
+    return "\<Esc>" . s:vars[s:modeCurrent].cmdOpen[a:index] . item . "\<CR>"
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>CompleteBuffer(findstart, base)
     if a:findstart
         return 0
@@ -417,9 +304,7 @@ function! <SID>CompleteBuffer(findstart, base)
     return result
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>CompleteFile(findstart, base)
     if a:findstart
         return 0
@@ -455,9 +340,7 @@ function! <SID>CompleteFile(findstart, base)
     return result
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 " "str" -> "*s*t*r*" 
 function! <SID>MakeFuzzyPattern(in)
     let out = ''
@@ -477,9 +360,7 @@ function! <SID>MakeFuzzyPattern(in)
     return out
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>ConvertWildcardToRegexp(in)
     let out = escape(a:in, '\')
     let out = substitute(out, '*', '\\.\\*', 'g')
@@ -489,9 +370,7 @@ function! <SID>ConvertWildcardToRegexp(in)
     return out
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>ExpandCase(in)
     let out = ''
     for char in split(a:in,'\zs')
@@ -505,25 +384,18 @@ function! <SID>ExpandCase(in)
     return out
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>ExistsPrompt(in)
     return strlen(a:in) >= strlen(s:prompt) && a:in[:strlen(s:prompt) -1] ==# s:prompt
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>SplitPath(path)
     let dir = matchstr(a:path, '^.*[/\\]')
     return [dir, a:path[strlen(dir):]]
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-
+"-----------------------------------------------------------------------------
 function! <SID>GlobEx(patternW)
     let patternWHead = <SID>SplitPath(a:patternW)[0]
 
@@ -549,27 +421,21 @@ function! <SID>GlobEx(patternW)
     return map(filter(copy(s:globExCache), 'v:val[1] =~ patternRTail'), 'v:val[0] . v:val[1] . v:val[2]')
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>ClearGlobExCache()
     unlet! s:globExCacheDir
     unlet! s:globExCache
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>ShellEscapeEx(path)
     return a:path =~ '\s' ? shellescape(a:path) : a:path
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>MakeCompletionItemWithMatchingLevel(path, bufNr, abbr, input)
     let pathTail  = <SID>SplitPath(matchstr(a:path , '^.*[^/\\]'))[1]
-    let inputTail = <SID>SplitPath(matchstr(a:input, '^.*[^/\\]'))[1]
+    let inputTail = <SID>SplitPath(a:input)[1]
 
     " Evaluates matching level
     if a:bufNr >= 0 && a:bufNr == a:input
@@ -591,10 +457,7 @@ function! <SID>MakeCompletionItemWithMatchingLevel(path, bufNr, abbr, input)
                 \ 'mlevel': mlevel}
 endfunction
 
-
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>SortByMatchingLevel(i1, i2)
     if     a:i1['mlevel'] < a:i2['mlevel']
         return +1
@@ -608,13 +471,103 @@ function! <SID>SortByMatchingLevel(i1, i2)
     return 0
 endfunction
 
-
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
+"-----------------------------------------------------------------------------
 function! <SID>GetSIDPrefix()
     return matchstr(expand('<sfile>'), '<SNR>\d\+_')
 endfunction
 
+"-----------------------------------------------------------------------------
+function! <SID>OnCursorMovedI()
+    if !<SID>ExistsPrompt(getline('.'))
+        " a command prompt is removed
+        call setline('.', s:prompt . getline('.'))
+        call feedkeys(repeat("\<Right>", len(s:prompt)), 'n')
+        return
+    elseif col('.') <= len(s:prompt)
+        call feedkeys(repeat("\<Right>", len(s:prompt) - col('.') + 1), 'n')
+        return
+    endif
+
+    let deltaInputLength  = strlen(getline('.')) - s:lastInputLength
+    let s:lastInputLength = strlen(getline('.'))
+
+    " if the line was changed and cursor is placed on the end of the line
+    if deltaInputLength != 0 && col('.') > s:lastInputLength
+        call feedkeys("\<C-X>\<C-U>", 'n')
+    endif
+endfunction
+
+"-----------------------------------------------------------------------------
+function! <SID>OnInsertLeave()
+    if exists('s:reserveToggleMode')
+        unlet s:reserveToggleMode
+        call <SID>OpenInputWindow(s:modeCurrent == s:modeBuffer ? s:modeFile : s:modeBuffer)
+    else
+        quit
+    endif
+endfunction
+
+"-----------------------------------------------------------------------------
+function! <SID>OnBufLeave()
+    " resume autocomplpop.vim
+    if exists(':AutoComplPopUnlock')
+        :AutoComplPopUnlock
+    endif
+
+    call <SID>ClearGlobExCache()
+
+    let &completeopt = s:_completeopt
+    let &ignorecase  = s:_ignorecase
+    unlet s:bufNr
+
+    quit " Quit when other window clicked without leaving a insert mode.
+endfunction
+
+"-----------------------------------------------------------------------------
+function! <SID>OnCR(index)
+    let exp = <SID>GetSIDPrefix() . "GetCmdOpenItem('" . a:index . "'," . pumvisible() . ")"
+    return (pumvisible() ? "\<C-Y>" : "") . "\<C-R>=" . exp . "\<CR>"
+endfunction
+
+"-----------------------------------------------------------------------------
+function! <SID>OnBS()
+    return pumvisible() ? "\<C-E>\<BS>" : "\<BS>"
+endfunction
+
+"-----------------------------------------------------------------------------
+function! <SID>OnToggleMode()
+    let s:reserveToggleMode = 1
+    return "\<ESC>"
+endfunction
+
+
+"-----------------------------------------------------------------------------
+
+function! <SID>OnToggleIgnoreCase()
+    let &ignorecase = !&ignorecase
+    echo "ignorecase = " . &ignorecase
+    return ""
+endfunction
+
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" CONSTANTS
 
+let s:pathSeparator = has('win32') ? '\' : '/'
+let s:prompt = '>'
+let s:abortedResult = [{'word': ' ', 'abbr': 'ABORT: Too many matches (> g:FuzzyFinder_CompletionItemLimit)'}]
+"let s:modeIndexBuffer = 0
+"let s:modeIndexFile   = 1
+
+let s:modeBuffer = 'buffer'
+let s:modeFile =   'file'
+
+let s:vars = {s:modeBuffer : { 'cmdOpen'     : [':buffer ', ':sbuffer ', ':vertical :sbuffer '], 
+            \                  'bufferName'  : '[FuzzyFinder - Buffer]',
+            \                  'completeFunc': <SID>GetSIDPrefix() . 'CompleteBuffer' },
+            \ s:modeFile :   { 'cmdOpen'     : [':edit ', ':split ', ':vsplit '],
+            \                  'bufferName'  : '[FuzzyFinder - File]',
+            \                  'completeFunc': <SID>GetSIDPrefix() . 'CompleteFile' } }
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
