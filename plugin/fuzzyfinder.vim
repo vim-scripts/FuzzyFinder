@@ -2,9 +2,9 @@
 " fuzzyfinder.vim : The buffer/file/MRU/favorite explorer with the fuzzy pattern
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "
-" Last Change:  15-Oct-2007.
+" Last Change:  16-Oct-2007.
 " Author:       Takeshi Nishida <ns9tks(at)ns9tks.net>
-" Version:      1.1, for Vim 7.0
+" Version:      1.2, for Vim 7.0
 " Licence:      MIT Licence
 "
 "-----------------------------------------------------------------------------
@@ -111,6 +111,9 @@
 "
 "           :let g:FuzzyFinder_InfoFile = ""
 "
+"   About Migemo:
+"       Migemo is a search method for Japanese language.
+"
 "   About Adding Original Mode:
 "       This feature is UNDERSPECIFIED. You can add original mode by
 "       :FuzzyFinderAddMode command. To start the explorer with original mode,
@@ -142,6 +145,9 @@
 "
 "   g:FuzzyFinder_IgnoreCase:
 "       It ignores case in search patterns if non-zero is set.
+"
+"   g:FuzzyFinder_Migemo:
+"       It uses Migemo if non-zero is set.
 "
 "   g:FuzzyFinder_BufferModeVars:
 "       This is a dictionary. This applies only to buffer mode.
@@ -217,7 +223,6 @@
 "       :nnoremap <C-b> :FuzzyFinderMru<CR>
 "       :nnoremap <C-f> :FuzzyFinderFavorite<CR>
 "
-"
 "-----------------------------------------------------------------------------
 " Thanks:
 "   Vincent Wang
@@ -226,11 +231,9 @@
 "   Brian Doyle
 "
 "-----------------------------------------------------------------------------
-" ToDo:
-"   Migemo support. (for Japanese)
-"
-"-----------------------------------------------------------------------------
 " ChangeLog:
+"   1.2:
+"       - Added support for Migemo. (Migemo is Japanese search method.)
 "   1.1:
 "       - Added the favorite mode.
 "       - Added new features, which are abbreviations and multiple search.
@@ -253,6 +256,7 @@
 "
 "   0.6:
 "       - Fixed some bugs.
+
 "   0.5:
 "       - Improved response by aborting processing too many items.
 "       - Changed to be able to open a buffer/file not only in previous window
@@ -340,6 +344,10 @@ function! <SID>Initialize()
     ".........................................................................
     if !exists('g:FuzzyFinder_IgnoreCase')
         let g:FuzzyFinder_IgnoreCase = &ignorecase
+    endif
+    ".........................................................................
+    if !exists('g:FuzzyFinder_Migemo')
+        let g:FuzzyFinder_Migemo = 1
     endif
     ".........................................................................
     if !exists('g:FuzzyFinder_BufferModeVars')
@@ -505,7 +513,7 @@ function! <SID>AddMode(new_vars)
     else
         let s:vars[a:new_vars.name] = a:new_vars
         if exists('s:last_added_key')
-            let s:vars[a:new_vars.name].nextMode = s:vars[s:last_added_key].nextMode
+            let s:vars[a:new_vars.name ].nextMode = s:vars[s:last_added_key].nextMode
             let s:vars[s:last_added_key].nextMode = a:new_vars.name
             let s:last_added_key = a:new_vars.name
         else
@@ -656,6 +664,10 @@ function! <SID>MakeFuzzyPattern(base)
                 \                                    '*', '\\.\\*', 'g'),
                 \                         '?', '\\.', 'g'),
                 \              '[', '\\[', 'g')
+
+    if g:FuzzyFinder_Migemo && has('migemo')
+        let re .= '\|\m.*' . substitute(migemo(a:base), '\\_s\*', '.*', 'g') . '.*'
+    endif
 
     return { 'base': a:base, 'wi':wi, 're': re }
 endfunction
@@ -1021,4 +1033,6 @@ endfunction
 " INITIALIZE:
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 call <SID>Initialize()
+
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
