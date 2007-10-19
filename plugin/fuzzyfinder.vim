@@ -2,9 +2,9 @@
 " fuzzyfinder.vim : The buffer/file/MRU/favorite explorer with the fuzzy pattern
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "
-" Last Change:  16-Oct-2007.
+" Last Change:  19-Oct-2007.
 " Author:       Takeshi Nishida <ns9tks(at)ns9tks.net>
-" Version:      1.2, for Vim 7.0
+" Version:      1.3, for Vim 7.0
 " Licence:      MIT Licence
 "
 "-----------------------------------------------------------------------------
@@ -232,8 +232,12 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   1.3:
+"       - Fixed a handling of multi-byte characters.
+"
 "   1.2:
 "       - Added support for Migemo. (Migemo is Japanese search method.)
+"
 "   1.1:
 "       - Added the favorite mode.
 "       - Added new features, which are abbreviations and multiple search.
@@ -665,7 +669,7 @@ function! <SID>MakeFuzzyPattern(base)
                 \                         '?', '\\.', 'g'),
                 \              '[', '\\[', 'g')
 
-    if g:FuzzyFinder_Migemo && has('migemo')
+    if g:FuzzyFinder_Migemo && has('migemo') && a:base !~ '[^\x01-\x7e]'
         let re .= '\|\m.*' . substitute(migemo(a:base), '\\_s\*', '.*', 'g') . '.*'
     endif
 
