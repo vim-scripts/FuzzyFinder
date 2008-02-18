@@ -1,10 +1,10 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" fuzzyfinder.vim : The fuzzy-pattern explorer for
+" fuzzyfinder.vim : The fuzzy/partial pattern explorer for
 "                   buffer/file/MRU/favorite/tag/etc.
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "
 " Author:  Takeshi Nishida <ns9tks(at)gmail(dot)com>
-" Version: 2.1, for Vim 7.1
+" Version: 2.2, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -13,15 +13,17 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Description: {{{1
 "   Fuzzyfinder provides convenient ways to quickly reach the buffer/file you
-"   want. Fuzzyfinder finds matching files/buffers with a fuzzy pattern to
-"   which it converted the entered pattern.
+"   want. Fuzzyfinder finds matching files/buffers with a fuzzy/partial
+"   pattern to which it converted the entered pattern.
 "
-"   E.g.: the entered pattern / the fuzzy pattern
-"     abc      -> *a*b*c*
-"     a?c      -> *a?c*         (? matches one character.)
-"     dir/file -> dir/*f*i*l*e*
-"     d*r/file -> d*r/*f*i*l*e*
-"     ../**/s  -> ../**/*s*     (** allows searching a directory tree.)
+"   E.g.: entered pattern -> fuzzy pattern / partial pattern
+"         abc             -> *a*b*c*       / *abc*
+"         a?c             -> *a?c*         / *a?c*
+"         dir/file        -> dir/*f*i*l*e* / dir/*file*
+"         d*r/file        -> d*r/*f*i*l*e* / d*r/*file*
+"         ../**/s         -> ../**/*s*     / ../**/*s*
+"
+"     (** allows searching a directory tree.)
 "
 "   You will be happy when:
 "     "./OhLongLongLongLongLongFile.txt"
@@ -48,35 +50,38 @@
 "
 "-----------------------------------------------------------------------------
 " Usage: {{{1
-"   Starting The Explorer:
-"     You can start the explorer by the following commands:
+"   Starting Fuzzyfinder:
+"     You can start Fuzzyfinder by the following commands:
 "
-"       :FuzzyFinderBuffer      - launchs the buffer explorer.
-"       :FuzzyFinderFile        - launchs the file explorer.
-"       :FuzzyFinderMruFile     - launchs the MRU-file explorer.
-"       :FuzzyFinderFavFile     - launchs the favorite-file explorer.
-"       :FuzzyFinderDir         - launchs the directory explorer.
-"       :FuzzyFinderTag         - launchs the tag explorer.
-"       :FuzzyFinderTaggedFile  - launchs the tagged-file explorer.
+"       :FuzzyFinderBuffer      - launchs buffer-mode Fuzzyfinder.
+"       :FuzzyFinderFile        - launchs file-mode Fuzzyfinder.
+"       :FuzzyFinderMruFile     - launchs MRU-file-mode Fuzzyfinder.
+"       :FuzzyFinderFavFile     - launchs favorite-file-mode Fuzzyfinder.
+"       :FuzzyFinderDir         - launchs directory-mode Fuzzyfinder.
+"       :FuzzyFinderTag         - launchs tag-mode Fuzzyfinder.
+"       :FuzzyFinderTaggedFile  - launchs tagged-file-mode Fuzzyfinder.
 "
 "     It is recommended to map these commands. These commands can take initial
-"     text as argument. The text will be entered after explorer launched.
+"     text as a command argument. The text will be entered after Fuzzyfinder
+"     launched. If a command was executed with a ! modifier (e.g.
+"     :FuzzyFinderTag!), it enables the partial matching instead of the fuzzy
+"     matching.
 "
 "
-"   In The Explorer:
+"   In Fuzzyfinder:
 "     The entered pattern is converted to the fuzzy pattern and buffers/files
 "     which match the pattern is shown in a completion menu.
 "
 "     A completion menu is shown when you type at the end of the line and the
-"     length of entered pattern is more than setting value. By default, it
-"     is shown at the beginning.
+"     length of entered pattern is more than setting value. By default, it is
+"     shown at the beginning.
 "
 "     If too many items (200, by default) were matched, the completion is
 "     aborted to reduce nonresponse.
 "
-"     If entered pattern matched the item perfectly, the item is shown
-"     first. Same applies to the item number in the buffer/MRU/favorite mode.
-"     The item whose file name has longer prefix matching is placed upper. The
+"     If entered pattern matched the item exactly, the item is shown first.
+"     Same applies to the item number in the buffer/MRU/favorite mode.  The
+"     item whose file name has longer prefix matching is placed upper. The
 "     item which matched more sequentially is placed upper. It lets the first
 "     item into selected in completion menu.
 "
@@ -98,20 +103,29 @@
 "     Fuzzyfinder highlights the buffer with "Error" group when the completion
 "     item was not found or the completion process was aborted.
 "
+"   About Alternative Approach For Tag Jump:
+"     Following mappings are replacements for :tag and <C-]>:
+"
+"       nnoremap <silent> <C-f><C-t> :FuzzyFinderTag!<CR>
+"       nnoremap <silent> <C-]>      :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
+"
+"     In the tag mode, it is recommended to use partial matching instead of
+"     fuzzy matching.
+"
 "   About Tagged File Mode:
 "     The files which are included in the current tags are the ones which are
 "     related to the current working environment. So this mode is a pseudo
 "     project mode.
 "
 "   About Usage Of Command Argument:
-"     As an example, if you want to launch the file-mode explorer with the
+"     As an example, if you want to launch file-mode Fuzzyfinder with the
 "     directory of current buffer and not current directory, map as below:
 "
 "       nnoremap <C-p> :FuzzyFinderFile <C-r>=expand('%:~:.')[:-1-len(expand('%:~:.:t'))]<CR><CR>
 "
 "   About Abbreviations And Multiple Search:
-"     You can use abbreviations and multiple search in each mode. For
-"     example, set as below:
+"     You can use abbreviations and multiple search in each mode. For example,
+"     set as below:
 "
 "       let g:FuzzyFinderOptions.File.abbrev_map  = {
 "             \   "^WORK" : [
@@ -120,7 +134,7 @@
 "             \   ],
 "             \ }
 "
-"     And type "WORKtxt" in the file-mode explorer, then it searches by
+"     And type "WORKtxt" in file-mode Fuzzyfinder, then it searches by
 "     following patterns:
 "
 "       "~/project/**/src/*t*x*t*"
@@ -134,8 +148,8 @@
 "     If you do not specify the filename, current file name is used.
 "
 "   About Information File:
-"     Fuzzyfinder writes information of the MRU, favorite, etc to the file
-"     by default (~/.vimfuzzyfinder).
+"     Fuzzyfinder writes information of the MRU, favorite, etc to the file by
+"     default (~/.vimfuzzyfinder).
 "
 "   About Cache:
 "     Once a cache was created, It is not updated automatically to improve
@@ -176,8 +190,9 @@
 "   nnoremap <silent> <C-f><C-n> :FuzzyFinderMruFile<CR>
 "   nnoremap <silent> <C-f><C-f> :FuzzyFinderFavFile<CR>
 "   nnoremap <silent> <C-f><C-d> :FuzzyFinderDir <C-r>=fnamemodify('.', ':p')<CR><CR>
-"   nnoremap <silent> <C-f><C-t> :FuzzyFinderTag<CR>
+"   nnoremap <silent> <C-f><C-t> :FuzzyFinderTag!<CR>
 "   nnoremap <silent> <C-f><C-g> :FuzzyFinderTaggedFile<CR>
+"   nnoremap <silent> <C-]>      :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
 "
 "-----------------------------------------------------------------------------
 " Thanks: {{{1
@@ -189,6 +204,9 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog: {{{1
+"   2.2:
+"     - Added new feature, which is the partial matching.
+"     - Fixed the bug that an error occurs when "'" was entered.
 "   2.1:
 "     - Restructured the option system AGAIN. Sorry :p
 "     - Changed to inherit a typed text when switching a mode without leaving
@@ -320,14 +338,14 @@ let loaded_fuzzyfinder = 1
 " FUNCTIONS:
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-function! <SID>Initialize()
+function! s:Initialize()
   " INITIALIZATION: CONSTANTS: {{{1
   "...........................................................................
   let s:info_version = 104
   let s:path_separator = (has('win32') || has('win64') ? '\' : '/')
   let s:prompt = '>'
   let s:matching_rate_base = 10000000
-  let s:sid_prefix = matchstr(expand('<sfile>'), '<SNR>\d\+_')
+  let s:sid_prefix = matchstr(expand('<sfile>'), '<SNR>\d\+_') " global name of 's:'
   let s:msg_rm_info = "==================================================\n" .
         \             "  Your fuzzyfinder information file is no longer \n"  .
         \             "  supported. Please remove\n"                         .
@@ -455,34 +473,34 @@ function! <SID>Initialize()
 
   " INITIALIZATION: COMMANDS AND AUTOCOMMANDS: {{{1
   "...........................................................................
-  command! -bar -narg=? -complete=buffer  FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch(<q-args>)
-  command! -bar -narg=? -complete=file    FuzzyFinderFile        call g:FuzzyFinderMode.File.launch(<q-args>)
-  command! -bar -narg=? -complete=file    FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch(<q-args>)
-  command! -bar -narg=? -complete=file    FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch(<q-args>)
-  command! -bar -narg=? -complete=dir     FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch(<q-args>)
-  command! -bar -narg=? -complete=tag     FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch(<q-args>)
-  command! -bar -narg=? -complete=file    FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>)
-  command! -bar -narg=? -complete=file    FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
-  command! -bar -narg=0                   FuzzyFinderRemoveCache for m in <SID>GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
-
   augroup FuzzyFinderGlobalAutoCommand
     autocmd!
-    autocmd BufEnter     * for m in <SID>GetAvailableModes() | call m.on_buf_enter() | endfor
-    autocmd BufWritePost * for m in <SID>GetAvailableModes() | call m.on_buf_write_post() | endfor
+    autocmd BufEnter     * for m in s:GetAvailableModes() | call m.on_buf_enter() | endfor
+    autocmd BufWritePost * for m in s:GetAvailableModes() | call m.on_buf_write_post() | endfor
   augroup END
 
-  " }}}1
+  command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len('<bang>'))
+  command! -bang -narg=? -complete=file   FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
+  command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
+
+" }}}1
 endfunction
 
 " CORE FUNCTIONS: {{{1
 "-----------------------------------------------------------------------------
-function! <SID>GetAvailableModes()
+function! s:GetAvailableModes()
   return filter(values(g:FuzzyFinderMode), 'exists(''v:val.mode_available'') && v:val.mode_available')
 endfunction
 
 "-----------------------------------------------------------------------------
 " set or restore temporary option 
-function! <SID>SetTemporaryOption(option, ...)
+function! s:SetTemporaryOption(option, ...)
   if a:0 == 1
     if !exists('s:_{a:option}')
       execute printf('let s:_{a:option} = &%s', a:option)
@@ -496,7 +514,7 @@ endfunction
 
 " LIST FUNCTIONS: {{{1
 "-----------------------------------------------------------------------------
-function <SID>Unique(in)
+function! s:Unique(in)
   let sorted = sort(a:in)
 
   if len(sorted) < 2
@@ -516,7 +534,7 @@ function <SID>Unique(in)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>Concat(in)
+function! s:Concat(in)
   let result = []
   for l in a:in
     let result += l
@@ -526,16 +544,16 @@ endfunction
 
 "-----------------------------------------------------------------------------
 " copy + filter + limit
-function! <SID>FilterEx(in, string, limit)
+function! s:FilterEx(in, expr, limit)
   if a:limit <= 0
-    return filter(copy(a:in), a:string)
+    return filter(copy(a:in), a:expr)
   endif
 
   let result = []
 
   let stride = a:limit * 3 / 2 " x1.5
   for i in range(0, len(a:in) - 1, stride)
-    let result += filter(a:in[i : i + stride - 1], a:string)
+    let result += filter(a:in[i : i + stride - 1], a:expr)
     if len(result) >= a:limit
       return remove(result, 0, a:limit - 1)
     endif
@@ -545,7 +563,7 @@ function! <SID>FilterEx(in, string, limit)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>MakeNumberedList(in, first)
+function! s:MakeNumberedList(in, first)
   for i in range(len(a:in))
     let a:in[i] = [i + a:first, a:in[i]]
   endfor
@@ -555,7 +573,16 @@ endfunction
 
 " MISC: {{{1
 "-----------------------------------------------------------------------------
-function! <SID>ExpandAbbrevMap(base, abbrev_map)
+function! s:ConvertWildcardToRegexp(expr)
+  let re = escape(a:expr, '\')
+  for [pat, sub] in [ [ '*', '\\.\\*' ], [ '?', '\\.' ], [ '[', '\\[' ], ]
+    let re = substitute(re, pat, sub, 'g')
+  endfor
+  return '\V' . re
+endfunction
+
+"-----------------------------------------------------------------------------
+function! s:ExpandAbbrevMap(base, abbrev_map)
   let result = [a:base]
 
   " expand
@@ -567,27 +594,27 @@ function! <SID>ExpandAbbrevMap(base, abbrev_map)
     endfor
   endfor
 
-  return <SID>Unique(result)
+  return s:Unique(result)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>ExistsPrompt(in)
+function! s:ExistsPrompt(in)
   return strlen(a:in) >= strlen(s:prompt) && a:in[:strlen(s:prompt) -1] ==# s:prompt
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>RemovePrompt(in)
-  return (<SID>ExistsPrompt(a:in) ? a:in[strlen(s:prompt):] : a:in)
+function! s:RemovePrompt(in)
+  return (s:ExistsPrompt(a:in) ? a:in[strlen(s:prompt):] : a:in)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>SplitPath(path)
+function! s:SplitPath(path)
   let dir = matchstr(a:path, '^.*[/\\]')
   return [dir, a:path[strlen(dir):]]
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>GetBuffers()
+function! s:GetBuffers()
   redir => buffers | silent buffers! | redir END
   return map(map(split(buffers, "\n"),
         \        'matchlist(v:val, ''^\s*\(\d*\)\([^"]*\)"\([^"]*\)".*$'')'),
@@ -597,12 +624,12 @@ function! <SID>GetBuffers()
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>GetTagList(tagfile)
+function! s:GetTagList(tagfile)
   return map(readfile(a:tagfile), 'matchstr(v:val, ''^[^!\t][^\t]*'')')
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>GetTaggedFileList(tagfile)
+function! s:GetTaggedFileList(tagfile)
   execute 'cd ' . fnamemodify(a:tagfile, ':h')
   let result = map(readfile(a:tagfile), 'fnamemodify(matchstr(v:val, ''^[^!\t][^\t]*\t\zs[^\t]\+''), '':p:~'')')
   cd -
@@ -610,27 +637,27 @@ function! <SID>GetTaggedFileList(tagfile)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>MakeCompletionItem(expr, number_str, abbr, time, entered, evals_path_tail)
+function! s:MakeCompletionItem(expr, number_str, abbr, time, entered, evals_path_tail)
   let number = str2nr(a:number_str)
   if      (number >= 0 && str2nr(number) == str2nr(a:entered)) || (a:expr == a:entered)
     let rate = s:matching_rate_base
   elseif a:evals_path_tail
-    let rate = <SID>EvaluateMatchingRate(<SID>SplitPath(matchstr(a:expr, '^.*[^/\\]'))[1],
-          \                              <SID>SplitPath(a:entered)[1])
+    let rate = s:EvaluateMatchingRate(s:SplitPath(matchstr(a:expr, '^.*[^/\\]'))[1],
+          \                           s:SplitPath(a:entered)[1])
   else
-    let rate = <SID>EvaluateMatchingRate(a:expr, a:entered)
+    let rate = s:EvaluateMatchingRate(a:expr, a:entered)
   endif
 
   return  {
         \   'word'  : a:expr,
         \   'abbr'  : (number >= 0 ? printf('%2d: ', number) : '') . a:abbr,
-        \   'menu'  : printf('%s[%s]', (len(a:time) ? a:time . ' ' : ''), <SID>MakeRateStars(rate, 5)),
+        \   'menu'  : printf('%s[%s]', (len(a:time) ? a:time . ' ' : ''), s:MakeRateStars(rate, 5)),
         \   'order' : [-rate, (number >= 0 ? number : a:expr)]
         \ }
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>EvaluateMatchingRate(expr, pattern)
+function! s:EvaluateMatchingRate(expr, pattern)
   if a:expr == a:pattern
     return s:matching_rate_base
   endif
@@ -658,13 +685,13 @@ function! <SID>EvaluateMatchingRate(expr, pattern)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>MakeRateStars(rate, base)
+function! s:MakeRateStars(rate, base)
   let len = (a:base * a:rate) / s:matching_rate_base
   return repeat('*', len) . repeat('.', a:base - len)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>HighlightError(error)
+function! s:HighlightError(error)
   if a:error
     syntax match Error  /^.*$/
   else
@@ -674,7 +701,7 @@ endfunction
 
 
 "-----------------------------------------------------------------------------
-function! <SID>SortByMultipleOrder(i1, i2)
+function! s:SortByMultipleOrder(i1, i2)
   if exists('a:i1.order') && exists('a:i2.order')
     for i in range(min([len(a:i1.order), len(a:i2.order)]))
       if     a:i1.order[i] > a:i2.order[i]
@@ -688,7 +715,7 @@ function! <SID>SortByMultipleOrder(i1, i2)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>GetPathSeparatorIfDirectory(path)
+function! s:GetPathSeparatorIfDirectory(path)
   if isdirectory(a:path)
     return s:path_separator
   else
@@ -697,7 +724,7 @@ function! <SID>GetPathSeparatorIfDirectory(path)
 endfunction
 
 "-----------------------------------------------------------------------------
-function! <SID>GetCurrentTagFiles()
+function! s:GetCurrentTagFiles()
   return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
 endfunction
 
@@ -710,7 +737,7 @@ endfunction
 " FuzzyFinderMode: Base: launch {{{1
 let g:FuzzyFinderMode = { 'Base' : {} }
 "-----------------------------------------------------------------------------
-function! g:FuzzyFinderMode.Base.launch(initial_text)
+function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching)
   call self.extend_options()
   if !self.mode_available
     echo 'This mode is not available: ' . self.to_str()
@@ -720,13 +747,14 @@ function! g:FuzzyFinderMode.Base.launch(initial_text)
   let s:last_col = -1
 
   call self.read_info_from_file()
+  let self.partial_matching = a:partial_matching
 
   " the fuzzyfinder-buffer was already created?
   if exists('s:buf_nr')
     execute 'buffer ' . s:buf_nr
     delete _
   else
-    let s:tag_files = <SID>GetCurrentTagFiles() " to get local value of current buffer
+    let s:tag_files = s:GetCurrentTagFiles() " to get local value of current buffer
 
     1new
     let s:buf_nr = bufnr('%')
@@ -737,8 +765,8 @@ function! g:FuzzyFinderMode.Base.launch(initial_text)
     endif
 
     " global setting
-    call <SID>SetTemporaryOption('completeopt', 'menuone')
-    call <SID>SetTemporaryOption('ignorecase', self.ignore_case)
+    call s:SetTemporaryOption('completeopt', 'menuone')
+    call s:SetTemporaryOption('ignorecase', self.ignore_case)
 
   endif
 
@@ -774,7 +802,7 @@ function! g:FuzzyFinderMode.Base.launch(initial_text)
     execute printf('inoremap <buffer> <silent> %s <C-r>=%s ? "" : ""<CR>', lhs, rhs)
   endfor
 
-  call <SID>HighlightError(0)
+  call s:HighlightError(0)
   call self.on_mode_enter()
 
   " Starts insert mode and makes CursorMovedI event now. Command prompt is
@@ -786,7 +814,7 @@ endfunction
 " FuzzyFinderMode: Base: EVENT HANDLERS {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.on_cursor_moved_i()
-  if !<SID>ExistsPrompt(getline('.'))
+  if !s:ExistsPrompt(getline('.'))
     " if command prompt is removed
     call setline('.', s:prompt . getline('.'))
     call feedkeys(repeat("\<Right>", len(s:prompt)), 'n')
@@ -808,7 +836,7 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
     let m = self.next_mode(s:reserved_switch_mode < 0)
-    call m.launch(<SID>RemovePrompt(getline('.')))
+    call m.launch(s:RemovePrompt(getline('.')), self.partial_matching)
     unlet s:reserved_switch_mode
   else
     close
@@ -822,8 +850,8 @@ function! g:FuzzyFinderMode.Base.on_buf_leave()
     :AutoComplPopUnlock
   endif
 
-  call <SID>SetTemporaryOption('completeopt')
-  call <SID>SetTemporaryOption('ignorecase')
+  call s:SetTemporaryOption('completeopt')
+  call s:SetTemporaryOption('ignorecase')
   unlet s:buf_nr
 
   ":close " closes when other window clicked without leaving a insert mode.
@@ -853,7 +881,7 @@ function! g:FuzzyFinderMode.Base.on_cr(index, check_dir)
   if pumvisible()
     call feedkeys(printf("\<C-y>\<C-r>=%s(%d, 1) ? '' : ''\<CR>", self.to_str('on_cr'), a:index), 'n')
   elseif !a:check_dir || getline('.') !~ '[/\\]$'
-    let s:reserved_command = [<SID>RemovePrompt(getline('.')), a:index]
+    let s:reserved_command = [s:RemovePrompt(getline('.')), a:index]
     call feedkeys("\<Esc>", 'n')
   endif
 endfunction
@@ -931,31 +959,31 @@ function! g:FuzzyFinderMode.Base.write_info_to_file()
   endtry
 endfunction
 
-" FuzzyFinderMode: Base: MISC {{{1
+" FuzzyFinderMode: Base: COMPLETION {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.complete(findstart, base)
   if a:findstart 
     return 0
-  elseif  !<SID>ExistsPrompt(a:base) || len(<SID>RemovePrompt(a:base)) < self.min_length
+  elseif  !s:ExistsPrompt(a:base) || len(s:RemovePrompt(a:base)) < self.min_length
     return []
   endif
 
-  call <SID>HighlightError(0)
+  call s:HighlightError(0)
 
   "" SEGV!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  "let result = sort(<SID>Concat(map(<SID>ExpandAbbrevMap(<SID>RemovePrompt(a:base),
+  "let result = sort(s:Concat(map(s:ExpandAbbrevMap(s:RemovePrompt(a:base),
   "      \                                                self.abbrev_map),
   "      \                           'self.on_complete(v:val)')),
-  "      \           '<SID>SortByMultipleOrder')
+  "      \           's:SortByMultipleOrder')
   let result = []
-  for expanded_base in <SID>ExpandAbbrevMap(<SID>RemovePrompt(a:base), self.abbrev_map)
+  for expanded_base in s:ExpandAbbrevMap(s:RemovePrompt(a:base), self.abbrev_map)
     let result += self.on_complete(expanded_base)
   endfor
-  call sort(result, '<SID>SortByMultipleOrder')
+  call sort(result, 's:SortByMultipleOrder')
 
 
   if empty(result)
-    call <SID>HighlightError(1)
+    call s:HighlightError(1)
   else
     call feedkeys("\<C-p>\<Down>", 'n')
   endif
@@ -966,38 +994,43 @@ endfunction
 "-----------------------------------------------------------------------------
 " This function is set to 'completefunc' which doesn't accept dictionary-functions.
 function! g:FuzzyFinderMode.Base.make_complete_func(name)
-  execute printf("function! <SID>%s(findstart, base)\n" .
+  execute printf("function! s:%s(findstart, base)\n" .
         \        "  return %s.complete(a:findstart, a:base)\n" .
         \        "endfunction", a:name, self.to_str())
   return s:sid_prefix . a:name
 endfunction
 
 "-----------------------------------------------------------------------------
-" 'str' -> {'base':'str', 'wi':'*s*t*r*', 're':'\V\.\*s\.\*t\.\*r\.\*'}
-function! g:FuzzyFinderMode.Base.make_fuzzy_pattern(base)
-  let wi = ''
-  for char in split(a:base, '\zs')
-    if wi !~ '[*?]$' && char !~ '[*?]'
-      let wi .= '*'. char
-    else
-      let wi .= char
+" fuzzy  : 'str' -> {'base':'str', 'wi':'*s*t*r*', 're':'\V\.\*s\.\*t\.\*r\.\*'}
+" partial: 'str' -> {'base':'str', 'wi':'*str*', 're':'\V\.\*str\.\*'}
+function! g:FuzzyFinderMode.Base.make_pattern(base)
+  if self.partial_matching
+    let wi = (a:base !~ '^[*?]'  ? '*' : '') . a:base .
+          \  (a:base =~ '[^*?]$' ? '*' : '')
+    let re = s:ConvertWildcardToRegexp(wi)
+    return { 'base': a:base, 'wi':wi, 're': re }
+  else
+    let wi = ''
+    for char in split(a:base, '\zs')
+      if wi !~ '[*?]$' && char !~ '[*?]'
+        let wi .= '*'. char
+      else
+        let wi .= char
+      endif
+    endfor
+
+    if wi !~ '[*?]$'
+      let wi .= '*'
     endif
-  endfor
 
-  if wi !~ '[*?]$'
-    let wi .= '*'
+    let re = s:ConvertWildcardToRegexp(wi)
+
+    if self.migemo_support && a:base !~ '[^\x01-\x7e]'
+      let re .= '\|\m.*' . substitute(migemo(a:base), '\\_s\*', '.*', 'g') . '.*'
+    endif
+
+    return { 'base': a:base, 'wi':wi, 're': re }
   endif
-
-  let re = '\V' . substitute(substitute(substitute(escape(wi, '\'),
-        \                                          '*', '\\.\\*', 'g'),
-        \                               '?', '\\.', 'g'),
-        \                    '[', '\\[', 'g')
-
-  if self.migemo_support && a:base !~ '[^\x01-\x7e]'
-    let re .= '\|\m.*' . substitute(migemo(a:base), '\\_s\*', '.*', 'g') . '.*'
-  endif
-
-  return { 'base': a:base, 'wi':wi, 're': re }
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1009,13 +1042,13 @@ function! g:FuzzyFinderMode.Base.glob_ex(dir, file, excluded, matching_limit)
   if !exists('self.cache[key]')
     echo 'Caching file list...'
     let dirs = (key =~ '\S' ? split(expand(a:dir), "\n") : [""])
-    let self.cache[key] = <SID>Concat(map(copy(dirs), 'split(glob(v:val . ".*"), "\n") + ' .
+    let self.cache[key] = s:Concat(map(copy(dirs), 'split(glob(v:val . ".*"), "\n") + ' .
           \                               'split(glob(v:val . "*" ), "\n")'))
 
     if len(dirs) <= 1
-      call map(self.cache[key], '[a:dir, <SID>SplitPath(v:val)[1], <SID>GetPathSeparatorIfDirectory(v:val)]')
+      call map(self.cache[key], '[a:dir, s:SplitPath(v:val)[1], s:GetPathSeparatorIfDirectory(v:val)]')
     else
-      call map(self.cache[key], '<SID>SplitPath(v:val) + [<SID>GetPathSeparatorIfDirectory(v:val)]')
+      call map(self.cache[key], 's:SplitPath(v:val) + [s:GetPathSeparatorIfDirectory(v:val)]')
     endif
 
     if len(a:excluded)
@@ -1024,37 +1057,45 @@ function! g:FuzzyFinderMode.Base.glob_ex(dir, file, excluded, matching_limit)
   endif
 
   echo 'Filtering file list...'
-  return map(<SID>FilterEx(self.cache[key], 'v:val[1] =~ ''' . a:file . '''', a:matching_limit),
+  return map(s:FilterEx(self.cache[key], 'v:val[1] =~ ' . string(a:file), a:matching_limit),
         \    'v:val[0] . v:val[1] . v:val[2]')
 endfunction
 
+
+" FuzzyFinderMode: Base: MISC {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.empty_cache_if_existed(force)
   if exists('self.cache') && (a:force || !exists('self.lasting_cache') || !self.lasting_cache)
-    let self.cache = (type(self.cache) == type({}) ? {} :
-          \           type(self.cache) == type([]) ? [] :
-          \           type(self.cache) == type('') ? '' : 0)
+    unlet self.cache
+    "let self.cache = (type(self.cache) == type({}) ? {} :
+    "      \           type(self.cache) == type([]) ? [] :
+    "      \           type(self.cache) == type('') ? '' : 0)
   endif
 endfunction
 
 "-----------------------------------------------------------------------------
-function! g:FuzzyFinderMode.Base.to_str(...)
-  let name = filter(map(keys(g:FuzzyFinderMode), '''g:FuzzyFinderMode.'' . v:val'),
-        \           'eval(v:val) is self')[0]
-  return (a:0 > 0 ? name . '.' . a:1 : name)
+function! g:FuzzyFinderMode.Base.to_key()
+  return filter(keys(g:FuzzyFinderMode), 'g:FuzzyFinderMode[v:val] is self')[0]
 endfunction
 
 "-----------------------------------------------------------------------------
+" returns 'g:FuzzyFinderMode.{key}{.argument}'
+function! g:FuzzyFinderMode.Base.to_str(...)
+  return 'g:FuzzyFinderMode.' . self.to_key() . (a:0 > 0 ? '.' . a:1 : '')
+endfunction
+
+"-----------------------------------------------------------------------------
+" takes in g:FuzzyFinderOptions
 function! g:FuzzyFinderMode.Base.extend_options()
   let n = filter(keys(g:FuzzyFinderMode), 'g:FuzzyFinderMode[v:val] is self')[0]
   call extend(self, g:FuzzyFinderOptions.Base, 'force')
-  call extend(self, g:FuzzyFinderOptions[n], 'force')
+  call extend(self, g:FuzzyFinderOptions[self.to_key()], 'force')
 endfunction
 
 
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.next_mode(rev)
-  let modes = (a:rev ? <SID>GetAvailableModes() : reverse(<SID>GetAvailableModes()))
+  let modes = (a:rev ? s:GetAvailableModes() : reverse(s:GetAvailableModes()))
   let m_last = modes[-1]
   for m in modes
     if m is self
@@ -1072,21 +1113,21 @@ endfunction
 let g:FuzzyFinderMode.Buffer = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Buffer.on_complete(base)
-  let patterns = self.make_fuzzy_pattern(a:base)
+  let patterns = self.make_pattern(a:base)
 
   echo 'pattern:' . patterns.wi . (self.migemo_support ? ' + migemo' : '')
 
-  return map(filter(<SID>GetBuffers(),
+  return map(filter(s:GetBuffers(),
         \           'v:val.nr != s:buf_nr && v:val.ind !~ self.excluded_indicator && ' .
         \           '(v:val.nr == patterns.base || v:val.path =~ patterns.re)'),
-        \    '<SID>MakeCompletionItem(v:val.path, v:val.nr, v:val.ind . v:val.path, "", a:base, 1)')
+        \    's:MakeCompletionItem(v:val.path, v:val.nr, v:val.ind . v:val.path, "", a:base, 1)')
 endfunction
 
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " attempts to convert the path to the number for handling unnamed buffer
   let buf = a:expr
-  for buf_info in <SID>GetBuffers()
+  for buf_info in s:GetBuffers()
     if buf == buf_info.path
       let buf = buf_info.nr
       break
@@ -1108,17 +1149,17 @@ endfunction
 let g:FuzzyFinderMode.File = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.File.on_complete(base)
-  let patterns = map(<SID>SplitPath(a:base), 'self.make_fuzzy_pattern(v:val)')
+  let patterns = map(s:SplitPath(a:base), 'self.make_pattern(v:val)')
 
   let result = self.glob_ex(patterns[0].base, patterns[1].re, self.excluded_path, self.matching_limit)
 
   if len(result) >= self.matching_limit
-    call <SID>HighlightError(1)
+    call s:HighlightError(1)
   endif
 
   echo 'pattern:' . patterns[0].base . patterns[1].wi . (self.migemo_support ? ' + migemo' : '')
 
-  return map(result, '<SID>MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
+  return map(result, 's:MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
 
   return result
 endfunction
@@ -1133,7 +1174,7 @@ endfunction
 let g:FuzzyFinderMode.MruFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.MruFile.on_complete(base)
-  let patterns = self.make_fuzzy_pattern(a:base)
+  let patterns = self.make_pattern(a:base)
 
   if !has_key(s:info, 'mru_file')
     return []
@@ -1142,14 +1183,14 @@ function! g:FuzzyFinderMode.MruFile.on_complete(base)
   echo 'pattern:' . patterns.wi . (self.migemo_support ? ' + migemo' : '')
 
   return map(filter(copy(self.cache), 'v:val[0] == patterns.base || v:val[1].path =~ patterns.re'),
-        \    '<SID>MakeCompletionItem(v:val[1].path, v:val[0], v:val[1].path, v:val[1].time, a:base, 1)')
+        \    's:MakeCompletionItem(v:val[1].path, v:val[0], v:val[1].path, v:val[1].time, a:base, 1)')
 endfunction
 
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.MruFile.on_mode_enter()
   execute 'file [FuzzyFinder - MRU File]'
 
-  let self.cache = <SID>MakeNumberedList(map(copy(s:info.mru_file),
+  let self.cache = s:MakeNumberedList(map(copy(s:info.mru_file),
         \                                    '{ ''path'' : fnamemodify(v:val.path, '':~:.''),' .
         \                                    '  ''time'' : strftime(self.time_format, v:val.time) }'),
         \                                1)
@@ -1188,7 +1229,7 @@ endfunction
 let g:FuzzyFinderMode.FavFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.FavFile.on_complete(base)
-  let patterns = self.make_fuzzy_pattern(a:base)
+  let patterns = self.make_pattern(a:base)
 
   if !has_key(s:info, 'fav_file')
     return []
@@ -1196,9 +1237,9 @@ function! g:FuzzyFinderMode.FavFile.on_complete(base)
 
   echo 'pattern:' . patterns.wi . (self.migemo_support ? ' + migemo' : '')
 
-  return map(filter(<SID>MakeNumberedList(copy(s:info.fav_file), 1),
+  return map(filter(s:MakeNumberedList(copy(s:info.fav_file), 1),
         \           'v:val[0] == patterns.base || v:val[1].path =~ patterns.re'),
-        \    '<SID>MakeCompletionItem(v:val[1].path, v:val[0], v:val[1].path,
+        \    's:MakeCompletionItem(v:val[1].path, v:val[0], v:val[1].path,
         \                             strftime(self.time_format,
         \                                      v:val[1].time),
         \                             a:base, 1)'
@@ -1231,7 +1272,7 @@ endfunction
 let g:FuzzyFinderMode.Dir = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Dir.on_complete(base)
-  let patterns = map(<SID>SplitPath(a:base), 'self.make_fuzzy_pattern(v:val)')
+  let patterns = map(s:SplitPath(a:base), 'self.make_pattern(v:val)')
 
   let result = filter(self.glob_ex(patterns[0].base, patterns[1].re, self.excluded_path, 0),
         \             'v:val =~ ''[/\\]$''')
@@ -1240,7 +1281,7 @@ function! g:FuzzyFinderMode.Dir.on_complete(base)
     call insert(result, patterns[0].base)
   endif
 
-  call map(result, '<SID>MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
+  call map(result, 's:MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
 
   if len(patterns[1].base) == 0
     let result[0].word = matchstr(result[0].word, '^.*[^/\\]')
@@ -1268,17 +1309,17 @@ endfunction
 let g:FuzzyFinderMode.Tag = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Tag.on_complete(base)
-  let patterns = self.make_fuzzy_pattern(a:base)
+  let patterns = self.make_pattern(a:base)
 
   let result = self.find_tag(patterns.re, self.matching_limit)
 
   if len(result) >= self.matching_limit
-    call <SID>HighlightError(1)
+    call s:HighlightError(1)
   endif
 
   echo 'pattern:' . patterns.wi . (self.migemo_support ? ' + migemo' : '')
 
-  return map(result,  '<SID>MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
+  return map(result,  's:MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1308,14 +1349,12 @@ function! g:FuzzyFinderMode.Tag.find_tag(pattern, matching_limit)
     echo 'Caching tag list...'
     let self.cache[key] = {
           \   'time' : localtime(),
-          \   'data' : <SID>Unique(<SID>Concat(map(copy(s:tag_files),
-          \                                        '<SID>GetTagList(v:val)'))),
+          \   'data' : s:Unique(s:Concat(map(copy(s:tag_files), 's:GetTagList(v:val)'))),
           \ }
   endif
 
   echo 'Filtering tag list...'
-  return <SID>FilterEx(self.cache[key].data,
-        \              'v:val =~ ''' . a:pattern . '''', a:matching_limit)
+  return s:FilterEx(self.cache[key].data, 'v:val =~ ' . string(a:pattern), a:matching_limit)
 endfunction
 
 
@@ -1323,18 +1362,18 @@ endfunction
 let g:FuzzyFinderMode.TaggedFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.TaggedFile.on_complete(base)
-  let patterns = self.make_fuzzy_pattern(a:base)
+  let patterns = self.make_pattern(a:base)
 
   echo 'Making tagged file list...'
   let result = self.find_tagged_file(patterns.re, self.matching_limit)
 
   if len(result) >= self.matching_limit
-    call <SID>HighlightError(1)
+    call s:HighlightError(1)
   endif
 
   echo 'pattern:' . patterns.wi . (self.migemo_support ? ' + migemo' : '')
 
-  return map(result,  '<SID>MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
+  return map(result,  's:MakeCompletionItem(v:val, -1, v:val, "", a:base, 1)')
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1357,14 +1396,14 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, matching_limit)
     echo 'Caching tagged-file list...'
     let self.cache[key] = {
           \   'time' : localtime(),
-          \   'data' : <SID>Unique(<SID>Concat(map(copy(s:tag_files),
-          \                                        '<SID>GetTaggedFileList(v:val)'))),
+          \   'data' : s:Unique(s:Concat(map(copy(s:tag_files), 's:GetTaggedFileList(v:val)'))),
           \ }
   endif
 
   echo 'Filtering tagged-file list...'
-  return <SID>FilterEx(map(self.cache[key].data, 'fnamemodify(v:val, '':.'')'),
-        \                  'v:val =~ ''' . a:pattern . '''', a:matching_limit)
+  return s:FilterEx(map(self.cache[key].data, 'fnamemodify(v:val, '':.'')'),
+        \               'v:val =~ ' . string(a:pattern),
+        \           a:matching_limit)
 
 endfunction
 
@@ -1375,7 +1414,7 @@ endfunction
 " INITIALIZE:
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-call <SID>Initialize()
+call s:Initialize()
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " vim:fdm=marker
