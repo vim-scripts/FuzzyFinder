@@ -4,7 +4,7 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "
 " Author:  Takeshi Nishida <ns9tks(at)gmail(dot)com>
-" Version: 2.3, for Vim 7.1
+" Version: 2.4, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -203,6 +203,10 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog: {{{1
+"   2.4:
+"     - Fixed the bug that Fuzzyfinder fails to open a file caused by auto-cd
+"       plugin/script.
+"
 "   2.3:
 "     - Added a key mapping to open items in a new tab page and
 "       g:FuzzyFinderOptions.Base.key_open_tab opton.
@@ -210,9 +214,11 @@
 "       'splitbelow' was set.
 "     - Changed to set nocursorline and nocursorcolumn in Fuzzyfinder.
 "     - Fixed not to push up a buffer number unlimitedly.
+"
 "   2.2:
 "     - Added new feature, which is the partial matching.
 "     - Fixed the bug that an error occurs when "'" was entered.
+"
 "   2.1:
 "     - Restructured the option system AGAIN. Sorry :p
 "     - Changed to inherit a typed text when switching a mode without leaving
@@ -230,6 +236,7 @@
 "     - Removed 'max_match' option. Use 'matching_limit' option instead.
 "     - Removed 'initial_text' option. Use command argument instead.
 "     - Removed the MRU-command mode.
+"
 "   2.0:
 "     - Added the tag mode.
 "     - Added the tagged-file mode.
@@ -506,28 +513,6 @@ function! s:GetAvailableModes()
   return filter(values(g:FuzzyFinderMode), 'exists(''v:val.mode_available'') && v:val.mode_available')
 endfunction
 
-"-----------------------------------------------------------------------------
-function! s:ActivateFuzzyFinderBuffer()
-  if !exists('s:fuzzyfinder_buf_nr') || !bufexists(s:fuzzyfinder_buf_nr)
-    leftabove 1new
-    let s:fuzzyfinder_buf_nr = bufnr('%')
-    execute 'file [Fuzzyfinder]'
-  elseif bufwinnr(s:fuzzyfinder_buf_nr) == -1
-    execute 'leftabove 1split | buffer ' . s:fuzzyfinder_buf_nr
-    delete _
-  elseif bufwinnr(s:fuzzyfinder_buf_nr) != bufwinnr('%')
-    execute bufwinnr(s:fuzzyfinder_buf_nr) . 'wincmd w'
-  endif
-
-  setlocal filetype=fuzzyfinder
-  setlocal bufhidden=delete
-  setlocal buftype=nofile
-  setlocal noswapfile
-  setlocal nobuflisted
-  setlocal modifiable
-  setlocal nocursorline   " for highlighting
-  setlocal nocursorcolumn " for highlighting
-endfunction
 
 " LIST FUNCTIONS: {{{1
 "-----------------------------------------------------------------------------
@@ -693,16 +678,7 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, tag_file
     return
   endif
 
-  " suspend autocomplpop.vim
-  if exists(':AutoComplPopLock')
-    :AutoComplPopLock
-  endif
-
-  " initializes buffer
-  call s:ActivateFuzzyFinderBuffer()
-
-  " options
-  let &l:completefunc = self.make_complete_func('CompleteFunc')
+  call s:WindowManager.activate(self.make_complete_func('CompleteFunc'))
   call s:OptionManager.set('completeopt', 'menuone')
   call s:OptionManager.set('ignorecase', self.ignore_case)
 
@@ -711,7 +687,6 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, tag_file
     autocmd!
     execute 'autocmd CursorMovedI <buffer>        call ' . self.to_str('on_cursor_moved_i()')
     execute 'autocmd InsertLeave  <buffer> nested call ' . self.to_str('on_insert_leave()'  )
-    execute 'autocmd BufLeave     <buffer>        call ' . self.to_str('on_buf_leave()'     )
   augroup END
 
   " local mapping
@@ -762,11 +737,7 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
   call self.on_mode_leave()
   call self.empty_cache_if_existed(0)
   call s:OptionManager.restore_all()
-
-  " resume autocomplpop.vim
-  if exists(':AutoComplPopUnlock')
-    :AutoComplPopUnlock
-  endif
+  call s:WindowManager.deactivate()
 
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
@@ -780,12 +751,6 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
       unlet s:reserved_command
     endif
   endif
-
-endfunction
-
-"-----------------------------------------------------------------------------
-function! g:FuzzyFinderMode.Base.on_buf_leave()
-  close
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1373,6 +1338,55 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, matching_limit)
 endfunction
 
 
+" WindowManager: {{{1
+let s:WindowManager = { 'buf_nr' : -1 }
+"-----------------------------------------------------------------------------
+function! s:WindowManager.activate(complete_func)
+  let self.prev_winnr = bufwinnr('%')
+  let cwd = getcwd()
+
+  if !bufexists(self.buf_nr)
+    leftabove 1new
+    let self.buf_nr = bufnr('%')
+    execute 'file [Fuzzyfinder]'
+  elseif bufwinnr(self.buf_nr) == -1
+    execute 'leftabove 1split | buffer ' . self.buf_nr
+    delete _
+  elseif bufwinnr(self.buf_nr) != bufwinnr('%')
+    execute bufwinnr(self.buf_nr) . 'wincmd w'
+  endif
+
+  " countermeasure for auto-cd script
+  execute ':lcd ' . cwd
+
+  setlocal filetype=fuzzyfinder
+  setlocal bufhidden=delete
+  setlocal buftype=nofile
+  setlocal noswapfile
+  setlocal nobuflisted
+  setlocal modifiable
+  setlocal nocursorline   " for highlighting
+  setlocal nocursorcolumn " for highlighting
+  let &l:completefunc = a:complete_func
+
+  " suspend autocomplpop.vim
+  if exists(':AutoComplPopLock')
+    :AutoComplPopLock
+  endif
+endfunction
+
+"-----------------------------------------------------------------------------
+function! s:WindowManager.deactivate()
+  " resume autocomplpop.vim
+  if exists(':AutoComplPopUnlock')
+    :AutoComplPopUnlock
+  endif
+
+  close
+  execute self.prev_winnr . 'wincmd w'
+endfunction
+
+
 " OptionManager: sets or restores temporary options {{{1
 let s:OptionManager = { 'originals' : {} }
 "-----------------------------------------------------------------------------
@@ -1391,6 +1405,7 @@ endfunction
 
 
 " }}}1
+
 
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
