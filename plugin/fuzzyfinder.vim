@@ -4,7 +4,7 @@
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 "
 " Author:  Takeshi Nishida <ns9tks(at)gmail(dot)com>
-" Version: 2.4, for Vim 7.1
+" Version: 2.5, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -169,17 +169,11 @@
 "   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
 "   let g:FuzzyFinderOptions.Base.ignore_case = 1
 "   let g:FuzzyFinderOptions.File.abbrev_map  = {
-"         \   '\C^VP' : [
-"         \     '$VIMRUNTIME/plugin/',
-"         \     '~/.vim/plugin/',
-"         \     '$VIM/.vim/plugin/',
-"         \     '$VIM/vimfiles/plugin/',
-"         \   ],
-"         \   '\C^VC' : [
-"         \     '$VIMRUNTIME/colors/',
-"         \     '~/.vim/colors/',
-"         \     '$VIM/.vim/colors/',
-"         \     '$VIM/vimfiles/colors/',
+"         \   '\C^VR' : [
+"         \     '$VIMRUNTIME/**',
+"         \     '~/.vim/**',
+"         \     '$VIM/.vim/**',
+"         \     '$VIM/vimfiles/**',
 "         \   ],
 "         \ }
 "   let g:FuzzyFinderOptions.MruFile.max_item = 400
@@ -203,6 +197,12 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog: {{{1
+"   2.5:
+"     - Fixed the bug that a wrong initial text is entered after switching to a
+"       next mode.
+"     - Fixed the bug that it does not return to previous window after leaving
+"       Fuzzyfinder one.
+"
 "   2.4:
 "     - Fixed the bug that Fuzzyfinder fails to open a file caused by auto-cd
 "       plugin/script.
@@ -330,8 +330,6 @@
 "
 "   0.1:
 "     - First release.
-"
-"
 "
 "-----------------------------------------------------------------------------
 " }}}1
@@ -734,6 +732,7 @@ endfunction
 
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.on_insert_leave()
+  let text = getline('.')
   call self.on_mode_leave()
   call self.empty_cache_if_existed(0)
   call s:OptionManager.restore_all()
@@ -742,10 +741,9 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
     let m = self.next_mode(s:reserved_switch_mode < 0)
-    call m.launch(self.remove_prompt(getline('.')), self.partial_matching, self.tag_files)
+    call m.launch(self.remove_prompt(text), self.partial_matching, self.tag_files)
     unlet s:reserved_switch_mode
   else
-    wincmd p
     if exists('s:reserved_command')
       call feedkeys(self.on_open(s:reserved_command[0], s:reserved_command[1]), 'n')
       unlet s:reserved_command
@@ -1405,8 +1403,6 @@ endfunction
 
 
 " }}}1
-
-
 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " INITIALIZE:
