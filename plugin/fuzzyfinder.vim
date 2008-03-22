@@ -1,17 +1,17 @@
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"=============================================================================
 " fuzzyfinder.vim : The fuzzy/partial pattern explorer for
 "                   buffer/file/MRU/favorite/tag/etc.
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"=============================================================================
 "
 " Author:  Takeshi Nishida <ns9tks(at)gmail(dot)com>
-" Version: 2.5, for Vim 7.1
+" Version: 2.5.1, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" DOCUMENT:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Description: {{{1
+"=============================================================================
+" DOCUMENT: (Japanese: http://vim.g.hatena.ne.jp/keyword/fuzzyfinder.vim)
+"
+" Description: ---------------------------------------------------------- {{{1
 "   Fuzzyfinder provides convenient ways to quickly reach the buffer/file you
 "   want. Fuzzyfinder finds matching files/buffers with a fuzzy/partial
 "   pattern to which it converted the entered pattern.
@@ -42,12 +42,10 @@
 "
 "   Fuzzyfinder supports the multibyte.
 "
-"-----------------------------------------------------------------------------
-" Installation: {{{1
+" Installation: --------------------------------------------------------- {{{1
 "   Drop this file in your plugin directory.
 "
-"-----------------------------------------------------------------------------
-" Usage: {{{1
+" Usage: ---------------------------------------------------------------- {{{1
 "   Starting Fuzzyfinder:
 "     You can start Fuzzyfinder by the following commands:
 "
@@ -90,9 +88,9 @@
 "       <C-]> - opens in a new tab page.
 "     These key mappings are customizable.
 "
-"     To cancel and return to previous window, leave the insert mode.
+"     To cancel and return to previous window, leave Insert mode.
 "
-"     To Switch the mode without leaving a insert mode, use <C-l> or <C-o>.
+"     To Switch the mode without leaving Insert mode, use <C-l> or <C-o>.
 "     This key mapping is customizable.
 "
 "     If you want to temporarily change whether or not to ignore case, use
@@ -126,7 +124,7 @@
 "     You can use abbreviations and multiple search in each mode. For example,
 "     set as below:
 "
-"       let g:FuzzyFinderOptions.File.abbrev_map  = {
+"       let g:FuzzyFinderOptions.Base.abbrev_map  = {
 "             \   "^WORK" : [
 "             \     "~/project/**/src/",
 "             \     ".vim/plugin/",
@@ -157,18 +155,16 @@
 "   About Migemo:
 "     Migemo is a search method for Japanese language.
 "
-"-----------------------------------------------------------------------------
-" Options: {{{1
+" Options: -------------------------------------------------------------- {{{1
 "   You can set options via g:FuzzyFinderOptions which is a dictionary. See
 "   the folded section named "INITIALIZATION: GLOBAL OPTIONS:" for details. To
 "   easily set options for customization, put necessary entries from GLOBAL
 "   OPTIONS into your vimrc file and edit those values.
 "
-"-----------------------------------------------------------------------------
-" Setting Example: {{{1
+" Setting Example: ------------------------------------------------------ {{{1
 "   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
 "   let g:FuzzyFinderOptions.Base.ignore_case = 1
-"   let g:FuzzyFinderOptions.File.abbrev_map  = {
+"   let g:FuzzyFinderOptions.Base.abbrev_map  = {
 "         \   '\C^VR' : [
 "         \     '$VIMRUNTIME/**',
 "         \     '~/.vim/**',
@@ -187,16 +183,20 @@
 "   nnoremap <silent> <C-f><C-g> :FuzzyFinderTaggedFile<CR>
 "   nnoremap <silent> <C-]>      :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
 "
-"-----------------------------------------------------------------------------
-" Thanks: {{{1
+" Special Thanks: --------------------------------------------------------------- {{{1
 "   Vincent Wang
 "   Ingo Karkat
 "   Nikolay Golubev
 "   Brian Doyle
 "   id:secondlife
+"   Matt Tolton
 "
-"-----------------------------------------------------------------------------
-" ChangeLog: {{{1
+" ChangeLog: ------------------------------------------------------------ {{{1
+"   2.5.1:
+"     - Fixed to be able to match "foo/./bar" by "foo/**/bar" in File mode.
+"     - Fixed to be able to open a space-containing file in File mode.
+"     - Fixed to honor the current working directory properly in File mode.
+"
 "   2.5:
 "     - Fixed the bug that a wrong initial text is entered after switching to a
 "       next mode.
@@ -222,7 +222,7 @@
 "   2.1:
 "     - Restructured the option system AGAIN. Sorry :p
 "     - Changed to inherit a typed text when switching a mode without leaving
-"       a insert mode.
+"       Insert mode.
 "     - Changed commands which launch explorers to be able to take a argument
 "       for initial text.
 "     - Changed to complete file names by relative path and not full path in
@@ -250,7 +250,7 @@
 "
 "   1.5:
 "     - Added the directory mode.
-"     - Fixed the bug that it caused an error when switch a mode in the insert
+"     - Fixed the bug that it caused an error when switch a mode in Insert
 "       mode.
 "     - Changed g:FuzzyFinder_KeySwitchMode type to a list.
 "
@@ -331,188 +331,29 @@
 "   0.1:
 "     - First release.
 "
-"-----------------------------------------------------------------------------
 " }}}1
+"=============================================================================
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" INCLUDE GUARD:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-" INCLUDE GUARD {{{1
-if exists('loaded_fuzzyfinder') || v:version < 700
+" INCLUDE GUARD: ======================================================== {{{1
+if exists('loaded_fuzzyfinder') || v:version < 701
   finish
 endif
 let loaded_fuzzyfinder = 1
-" }}}1
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" FUNCTIONS:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-function! s:Initialize()
-  " INITIALIZATION: GLOBAL OPTIONS: {{{1
-  "...........................................................................
-  " stores user-defined g:FuzzyFinderOptions {{{2
-  let user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {}) " }}}2
-
-  " Initializes g:FuzzyFinderOptions.
-  let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
-  "...........................................................................
-  " [All Mode] This is mapped to select completion item or finish input and
-  " open a buffer/file in previous window.
-  let g:FuzzyFinderOptions.Base.key_open = '<CR>'
-  " [All Mode] This is mapped to select completion item or finish input and
-  " open a buffer/file in split new window
-  let g:FuzzyFinderOptions.Base.key_open_split = '<C-j>'
-  " [All Mode] This is mapped to select completion item or finish input and
-  " open a buffer/file in vertical-split new window.
-  let g:FuzzyFinderOptions.Base.key_open_vsplit = '<C-k>'
-  " [All Mode] This is mapped to select completion item or finish input and
-  " open a buffer/file in a new tab page.
-  let g:FuzzyFinderOptions.Base.key_open_tab = '<C-]>'
-  " [All Mode] This is mapped to switch to the next mode.
-  let g:FuzzyFinderOptions.Base.key_next_mode = '<C-l>'
-  " [All Mode] This is mapped to switch to the previous mode.
-  let g:FuzzyFinderOptions.Base.key_prev_mode = '<C-o>'
-  " [All Mode] This is mapped to temporarily switch whether or not to ignore
-  " case.
-  let g:FuzzyFinderOptions.Base.key_ignore_case = '<C-t>'
-  " [All Mode] This is the file name to write information of the MRU, etc. If
-  " "" was set, it does not write to the file.
-  let g:FuzzyFinderOptions.Base.info_file = '~/.vimfuzzyfinder'
-  " [All Mode] It does not start a completion if a length of entered text is
-  " less than this.
-  let g:FuzzyFinderOptions.Base.min_length = 0
-  " [All Mode] It ignores case in search patterns if non-zero is set.
-  let g:FuzzyFinderOptions.Base.ignore_case = 1
-  " [All Mode] It does not remove caches of completion lists at the end of
-  " explorer to reuse at the next time if non-zero was set.
-  let g:FuzzyFinderOptions.Base.lasting_cache = 1
-  " [All Mode] It uses Migemo if non-zero is set.
-  let g:FuzzyFinderOptions.Base.migemo_support = 0
-  "...........................................................................
-  " [Buffer Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.Buffer.mode_available = 1
-  " [Buffer Mode] This is a dictionary. Each value must be a list. All matchs
-  " of a key in entered text is expanded with the value.
-  let g:FuzzyFinderOptions.Buffer.abbrev_map = {}
-  " [Buffer Mode] The items whose :ls-indicators match this are excluded from
-  " the completion list.
-  let g:FuzzyFinderOptions.Buffer.excluded_indicator = '[u\-]'
-  "...........................................................................
-  " [File Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.File.mode_available = 1
-  " [File Mode] This is a dictionary. Each value must be a list. All matchs of
-  " a key in entered text is expanded with a value.
-  let g:FuzzyFinderOptions.File.abbrev_map = {}
-  " [File Mode] The items matching this are excluded from the completion list.
-  let g:FuzzyFinderOptions.File.excluded_path = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$|((^|[/\\])\.[/\\]$)'
-  " [File Mode] If a number of matched items was over this, the completion
-  " process is aborted.
-  let g:FuzzyFinderOptions.File.matching_limit = 200
-  "...........................................................................
-  " [Mru-File Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.MruFile.mode_available = 1
-  " [Mru-File Mode] This is a dictionary. Each value must be a list. All
-  " matchs of a key in entered text is expanded with a value. 
-  let g:FuzzyFinderOptions.MruFile.abbrev_map = {}
-  " [Mru-File Mode] The items matching this are excluded from the completion
-  " list.
-  let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
-  " [Mru-File Mode] It ignores special buffers if non-zero was set.
-  let g:FuzzyFinderOptions.MruFile.no_special_buffer = 1
-  " [Mru-File Mode] This is a string to format registered time. See :help
-  " strftime() for details.
-  let g:FuzzyFinderOptions.MruFile.time_format = '(%x %H:%M:%S)'
-  " [Mru-File Mode] This is an upper limit of MRU items to be stored.
-  let g:FuzzyFinderOptions.MruFile.max_item = 99
-  "...........................................................................
-  " [Favorite-File Mode] It disables all functions of this mode if zero was
-  " set.
-  let g:FuzzyFinderOptions.FavFile.mode_available = 1
-  " [Favorite-File Mode] This is a dictionary. Each value must be a list. All
-  " matchs of a key in entered text is expanded with a value. 
-  let g:FuzzyFinderOptions.FavFile.abbrev_map = {}
-  " [Favorite-File Mode] This is a string to format registered time. See :help
-  " strftime() for details.
-  let g:FuzzyFinderOptions.FavFile.time_format = '(%x %H:%M:%S)'
-  "...........................................................................
-  " [Directory Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.Dir.mode_available = 1
-  " [Directory Mode] This is a dictionary. Each value must be a list. All
-  " matchs of a key in entered text is expanded with a value. 
-  let g:FuzzyFinderOptions.Dir.abbrev_map = {}
-  " [Directory Mode] The items matching this are excluded from the completion
-  " list.
-  let g:FuzzyFinderOptions.Dir.excluded_path = '\v(^|[/\\])\.{1,2}[/\\]$'
-  "...........................................................................
-  " [Tag Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.Tag.mode_available = 1
-  " [Tag Mode] This is a dictionary. Each value must be a list. All matchs of
-  " a key in entered text is expanded with a value. 
-  let g:FuzzyFinderOptions.Tag.abbrev_map = {}
-  " [Tag Mode] The items matching this are excluded from the completion list.
-  let g:FuzzyFinderOptions.Tag.excluded_path = '\v\~$|\.bak$|\.swp$'
-  " [Tag Mode] If a number of matched items was over this, the completion
-  " process is aborted.
-  let g:FuzzyFinderOptions.Tag.matching_limit = 200
-  "...........................................................................
-  " [Tagged-File Mode] It disables all functions of this mode if zero was set.
-  let g:FuzzyFinderOptions.TaggedFile.mode_available = 1
-  " [Tagged-File Mode] This is a dictionary. Each value must be a list. All
-  " matchs of a key in entered text is expanded with a value. 
-  let g:FuzzyFinderOptions.TaggedFile.abbrev_map = {}
-  " [Tagged-File Mode] If a number of matched items was over this, the
-  " completion process is aborted.
-  let g:FuzzyFinderOptions.TaggedFile.matching_limit = 200
-
-  "...........................................................................
-  " hidden options {{{2
-  let g:FuzzyFinderOptions.Base.info_version = 104
-  let g:FuzzyFinderOptions.Base.path_separator = (has('win32') || has('win64') ? '\' : '/')
-  let g:FuzzyFinderOptions.Base.prompt = '>'
-  let g:FuzzyFinderOptions.Base.matching_rate_base = 10000000
-  let g:FuzzyFinderOptions.Base.sid_prefix = matchstr(expand('<sfile>'), '<SNR>\d\+_') " global name of 's:'
-  let g:FuzzyFinderOptions.Base.msg_rm_info = "==================================================\n" .
-        \                                     "  Your fuzzyfinder information file is no longer \n"  .
-        \                                     "  supported. Please remove\n"                         .
-        \                                     "  \"%s\".\n"                                          .
-        \                                     "=================================================="
-
-  " overwrites default values of g:FuzzyFinderOptions with user-defined values {{{2
-  call map(user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
-  call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
-  " }}}2
-
-  " INITIALIZATION: COMMANDS AND AUTOCOMMANDS: {{{1
-  "...........................................................................
-  augroup FuzzyFinderGlobalAutoCommand
-    autocmd!
-    autocmd BufEnter     * for m in s:GetAvailableModes() | call m.on_buf_enter() | endfor
-    autocmd BufWritePost * for m in s:GetAvailableModes() | call m.on_buf_write_post() | endfor
-  augroup END
-
-  command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len('<bang>'), s:GetCurrentTagFiles())
-  command! -bang -narg=? -complete=file   FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
-  command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
-
-" }}}1
-endfunction
-
-" CORE FUNCTIONS: {{{1
+" FUNCTION: CORE FUNCTIONS: ============================================= {{{1
 "-----------------------------------------------------------------------------
 function! s:GetAvailableModes()
   return filter(values(g:FuzzyFinderMode), 'exists(''v:val.mode_available'') && v:val.mode_available')
 endfunction
 
+"-----------------------------------------------------------------------------
+function! s:GetSidPrefix()
+  return matchstr(expand('<sfile>'), '<SNR>\d\+_')
+endfunction
 
-" LIST FUNCTIONS: {{{1
+
+" FUNCTION: LIST FUNCTIONS: ============================================= {{{1
 "-----------------------------------------------------------------------------
 function! s:Unique(in)
   let sorted = sort(a:in)
@@ -534,11 +375,32 @@ function! s:Unique(in)
 endfunction
 
 "-----------------------------------------------------------------------------
+" [ [0], [1,2], [3] ] -> [ 0, 1, 2, 3 ]
 function! s:Concat(in)
   let result = []
   for l in a:in
     let result += l
   endfor
+  return result
+endfunction
+
+"-----------------------------------------------------------------------------
+" [ [ 0, 1 ], [ 2, 3, 4 ], ] -> [ [0,2], [0,3], [0,4], [1,2], [1,3], [1,4] ]
+function! s:CartesianProduct(lists)
+  if empty(a:lists)
+    return []
+  endif
+
+  "let result = map((a:lists[0]), '[v:val]')
+  let result = [ [] ]
+  for l in a:lists
+    let temp = []
+    for r in result
+      let temp += map(copy(l), 'add(copy(r), v:val)')
+    endfor
+    let result = temp
+  endfor
+
   return result
 endfunction
 
@@ -571,7 +433,7 @@ function! s:MakeNumberedList(in, first)
   return a:in
 endfunction
 
-" MISC: {{{1
+" FUNCTION: MISC: ======================================================= {{{1
 "-----------------------------------------------------------------------------
 function! s:ConvertWildcardToRegexp(expr)
   let re = escape(a:expr, '\')
@@ -595,6 +457,24 @@ function! s:ExpandAbbrevMap(base, abbrev_map)
   endfor
 
   return s:Unique(result)
+endfunction
+
+"-----------------------------------------------------------------------------
+" "**" is expanded to ["**", "."]. E.g.: "foo/**/bar" -> [ "foo/./bar", "foo/**/bar" ]
+function! s:ExpandEx(dir)
+  if a:dir !~ '\S'
+    return ['']
+  endif
+
+  " [ ["foo/"], ["**/", "./" ], ["bar/"] ]
+  let lists = []
+  for i in split(a:dir, '[/\\]\zs')
+    let m = matchlist(i, '^\*\{2,}\([/\\]*\)$')
+    call add(lists, (empty(m) ? [i] : [i, '.' . m[1]]))
+  endfor
+
+  " expand wlidcards
+  return split(join(map(s:CartesianProduct(lists), 'expand(join(v:val, ""))'), "\n"), "\n")
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -655,13 +535,8 @@ function! s:GetCurrentTagFiles()
   return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
 endfunction
 
-" }}}1
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" OBJECTS:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-" FuzzyFinderMode: Base: launch {{{1
+" OBJECT: FuzzyFinderMode: Base: launch ================================= {{{1
 let g:FuzzyFinderMode = { 'Base' : {} }
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, tag_files)
@@ -705,13 +580,13 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, tag_file
 
   call self.on_mode_enter()
 
-  " Starts insert mode and makes CursorMovedI event now. Command prompt is
+  " Starts Insert mode and makes CursorMovedI event now. Command prompt is
   " needed to forces a completion menu to update every typing.
   call setline(1, self.prompt . a:initial_text)
   call feedkeys("A", 'n') " startinsert! does not work in InsertLeave handler
 endfunction
 
-" FuzzyFinderMode: Base: EVENT HANDLERS {{{1
+" OBJECT: FuzzyFinderMode: Base: EVENT HANDLERS ========================= {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.on_cursor_moved_i()
   let ln = getline('.')
@@ -789,7 +664,7 @@ function! g:FuzzyFinderMode.Base.on_open(expr, mode)
         \   ':split ',
         \   ':vsplit ',
         \   ':tabedit ',
-        \ ][a:mode] . a:expr . "\<CR>"
+        \ ][a:mode] . escape(a:expr, ' ') . "\<CR>"
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -807,7 +682,7 @@ function! g:FuzzyFinderMode.Base.on_switch_ignore_case()
   call self.on_cursor_moved_i()
 endfunction
 
-" FuzzyFinderMode: Base: INFO FILE {{{1
+" OBJECT: FuzzyFinderMode: Base: INFO FILE ============================== {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.read_info_from_file()
   let s:info = {}
@@ -849,7 +724,7 @@ function! g:FuzzyFinderMode.Base.write_info_to_file()
   endtry
 endfunction
 
-" FuzzyFinderMode: Base: COMPLETION {{{1
+" OBJECT: FuzzyFinderMode: Base: COMPLETION ============================= {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.complete(findstart, base)
   if a:findstart 
@@ -882,7 +757,7 @@ function! g:FuzzyFinderMode.Base.make_complete_func(name)
   execute printf("function! s:%s(findstart, base)\n" .
         \        "  return %s.complete(a:findstart, a:base)\n" .
         \        "endfunction", a:name, self.to_str())
-  return self.sid_prefix . a:name
+  return s:GetSidPrefix() . a:name
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -975,14 +850,14 @@ endfunction
 "-----------------------------------------------------------------------------
 " glob with caching-feature, etc.
 function! g:FuzzyFinderMode.Base.glob_ex(dir, file, excluded, matching_limit)
-  let key = (a:dir =~ '\S' ? a:dir : ' ')
+  let key = fnamemodify(a:dir, ':p')
 
   call extend(self, { 'cache' : {} }, 'keep')
   if !exists('self.cache[key]')
     echo 'Caching file list...'
-    let dirs = (key =~ '\S' ? split(expand(a:dir), "\n") : [""])
+    let dirs = s:ExpandEx(a:dir)
     let self.cache[key] = s:Concat(map(copy(dirs), 'split(glob(v:val . ".*"), "\n") + ' .
-          \                               'split(glob(v:val . "*" ), "\n")'))
+          \                            'split(glob(v:val . "*" ), "\n")'))
 
     if len(dirs) <= 1
       call map(self.cache[key], '[a:dir, s:SplitPath(v:val)[1], (isdirectory(v:val) ? self.path_separator : '''')]')
@@ -1003,7 +878,7 @@ endfunction
 "-----------------------------------------------------------------------------
 
 
-" FuzzyFinderMode: Base: MISC {{{1
+" OBJECT: FuzzyFinderMode: Base: MISC =================================== {{{1
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Base.empty_cache_if_existed(force)
   if exists('self.cache') && (a:force || !exists('self.lasting_cache') || !self.lasting_cache)
@@ -1060,7 +935,7 @@ endfunction
 
 " }}}2
 
-" FuzzyFinderMode: Buffer: {{{1
+" OBJECT: FuzzyFinderMode: Buffer: ====================================== {{{1
 let g:FuzzyFinderMode.Buffer = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Buffer.on_complete(base)
@@ -1077,9 +952,9 @@ endfunction
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " attempts to convert the path to the number for handling unnamed buffer
-  let buf = a:expr
+  let buf = escape(a:expr, ' ')
   for buf_info in s:GetBuffers()
-    if buf == buf_info.path
+    if buf == escape(buf_info.path, ' ')
       let buf = buf_info.nr
       break
     endif
@@ -1093,7 +968,7 @@ function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
 endfunction
 
 
-" FuzzyFinderMode: File: {{{1
+" OBJECT: FuzzyFinderMode: File: ======================================== {{{1
 let g:FuzzyFinderMode.File = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.File.on_complete(base)
@@ -1113,7 +988,7 @@ function! g:FuzzyFinderMode.File.on_complete(base)
 endfunction
 
 
-" FuzzyFinderMode: MruFile: {{{1
+" OBJECT: FuzzyFinderMode: MruFile: ===================================== {{{1
 let g:FuzzyFinderMode.MruFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.MruFile.on_complete(base)
@@ -1165,7 +1040,7 @@ function! g:FuzzyFinderMode.MruFile.update_info()
 endfunction
 
 
-" FuzzyFinderMode: FavFile: {{{1
+" OBJECT: FuzzyFinderMode: FavFile: ===================================== {{{1
 let g:FuzzyFinderMode.FavFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.FavFile.on_complete(base)
@@ -1205,7 +1080,7 @@ function! g:FuzzyFinderMode.FavFile.add(in_file, adds)
 endfunction
 
 
-" FuzzyFinderMode: Dir: {{{1
+" OBJECT: FuzzyFinderMode: Dir: ========================================= {{{1
 let g:FuzzyFinderMode.Dir = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Dir.on_complete(base)
@@ -1231,7 +1106,7 @@ endfunction
 
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Dir.on_open(expr, mode)
-  return ':cd ' . a:expr . [
+  return ':cd ' . escape(a:expr, ' ') . [
         \   "\<CR>",
         \   "",
         \   "",
@@ -1240,7 +1115,7 @@ function! g:FuzzyFinderMode.Dir.on_open(expr, mode)
 endfunction
 
 
-" FuzzyFinderMode: Tag: {{{1
+" OBJECT: FuzzyFinderMode: Tag: ========================================= {{{1
 let g:FuzzyFinderMode.Tag = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.Tag.on_complete(base)
@@ -1291,7 +1166,7 @@ function! g:FuzzyFinderMode.Tag.find_tag(pattern, matching_limit)
 endfunction
 
 
-" FuzzyFinderMode: TaggedFile: {{{1
+" OBJECT: FuzzyFinderMode: TaggedFile: ================================== {{{1
 let g:FuzzyFinderMode.TaggedFile = copy(g:FuzzyFinderMode.Base)
 "-----------------------------------------------------------------------------
 function! g:FuzzyFinderMode.TaggedFile.on_complete(base)
@@ -1336,11 +1211,11 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, matching_limit)
 endfunction
 
 
-" WindowManager: {{{1
+" OBJECT: WindowManager: manages buffer/window for fuzzyfinder ========== {{{1
 let s:WindowManager = { 'buf_nr' : -1 }
 "-----------------------------------------------------------------------------
 function! s:WindowManager.activate(complete_func)
-  let self.prev_winnr = bufwinnr('%')
+  let self.prev_winnr = winnr()
   let cwd = getcwd()
 
   if !bufexists(self.buf_nr)
@@ -1367,6 +1242,8 @@ function! s:WindowManager.activate(complete_func)
   setlocal nocursorcolumn " for highlighting
   let &l:completefunc = a:complete_func
 
+  redraw " for 'lazyredraw'
+
   " suspend autocomplpop.vim
   if exists(':AutoComplPopLock')
     :AutoComplPopLock
@@ -1385,7 +1262,7 @@ function! s:WindowManager.deactivate()
 endfunction
 
 
-" OptionManager: sets or restores temporary options {{{1
+" OBJECT: OptionManager: sets or restores temporary options ============= {{{1
 let s:OptionManager = { 'originals' : {} }
 "-----------------------------------------------------------------------------
 function! s:OptionManager.set(name, value)
@@ -1401,15 +1278,141 @@ function! s:OptionManager.restore_all()
   let self.originals = {}
 endfunction
 
-
 " }}}1
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" INITIALIZE:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" INITIALIZATION: GLOBAL OPTIONS: ======================================= {{{1
+" stores user-defined g:FuzzyFinderOptions ------------------------------ {{{2
+let user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {})
+" }}}2
 
-call s:Initialize()
+" Initializes g:FuzzyFinderOptions.
+let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
+"-----------------------------------------------------------------------------
+" [All Mode] This is mapped to select completion item or finish input and
+" open a buffer/file in previous window.
+let g:FuzzyFinderOptions.Base.key_open = '<CR>'
+" [All Mode] This is mapped to select completion item or finish input and
+" open a buffer/file in split new window
+let g:FuzzyFinderOptions.Base.key_open_split = '<C-j>'
+" [All Mode] This is mapped to select completion item or finish input and
+" open a buffer/file in vertical-split new window.
+let g:FuzzyFinderOptions.Base.key_open_vsplit = '<C-k>'
+" [All Mode] This is mapped to select completion item or finish input and
+" open a buffer/file in a new tab page.
+let g:FuzzyFinderOptions.Base.key_open_tab = '<C-]>'
+" [All Mode] This is mapped to switch to the next mode.
+let g:FuzzyFinderOptions.Base.key_next_mode = '<C-l>'
+" [All Mode] This is mapped to switch to the previous mode.
+let g:FuzzyFinderOptions.Base.key_prev_mode = '<C-o>'
+" [All Mode] This is mapped to temporarily switch whether or not to ignore
+" case.
+let g:FuzzyFinderOptions.Base.key_ignore_case = '<C-t>'
+" [All Mode] This is the file name to write information of the MRU, etc. If
+" "" was set, it does not write to the file.
+let g:FuzzyFinderOptions.Base.info_file = '~/.vimfuzzyfinder'
+" [All Mode] It does not start a completion if a length of entered text is
+" less than this.
+let g:FuzzyFinderOptions.Base.min_length = 0
+" [All Mode] This is a dictionary. Each value must be a list. All matchs of a
+" key in entered text is expanded with the value.
+let g:FuzzyFinderOptions.Base.abbrev_map = {}
+" [All Mode] It ignores case in search patterns if non-zero is set.
+let g:FuzzyFinderOptions.Base.ignore_case = 1
+" [All Mode] It does not remove caches of completion lists at the end of
+" explorer to reuse at the next time if non-zero was set.
+let g:FuzzyFinderOptions.Base.lasting_cache = 1
+" [All Mode] It uses Migemo if non-zero is set.
+let g:FuzzyFinderOptions.Base.migemo_support = 0
+"-----------------------------------------------------------------------------
+" [Buffer Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.Buffer.mode_available = 1
+" [Buffer Mode] The items whose :ls-indicators match this are excluded from
+" the completion list.
+let g:FuzzyFinderOptions.Buffer.excluded_indicator = '[u\-]'
+"-----------------------------------------------------------------------------
+" [File Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.File.mode_available = 1
+" [File Mode] The items matching this are excluded from the completion list.
+let g:FuzzyFinderOptions.File.excluded_path = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$|((^|[/\\])\.[/\\]$)'
+" [File Mode] If a number of matched items was over this, the completion
+" process is aborted.
+let g:FuzzyFinderOptions.File.matching_limit = 200
+"-----------------------------------------------------------------------------
+" [Mru-File Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.MruFile.mode_available = 1
+" [Mru-File Mode] The items matching this are excluded from the completion
+" list.
+let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
+" [Mru-File Mode] It ignores special buffers if non-zero was set.
+let g:FuzzyFinderOptions.MruFile.no_special_buffer = 1
+" [Mru-File Mode] This is a string to format registered time. See :help
+" strftime() for details.
+let g:FuzzyFinderOptions.MruFile.time_format = '(%x %H:%M:%S)'
+" [Mru-File Mode] This is an upper limit of MRU items to be stored.
+let g:FuzzyFinderOptions.MruFile.max_item = 99
+"-----------------------------------------------------------------------------
+" [Favorite-File Mode] It disables all functions of this mode if zero was
+" set.
+let g:FuzzyFinderOptions.FavFile.mode_available = 1
+" [Favorite-File Mode] This is a string to format registered time. See :help
+" strftime() for details.
+let g:FuzzyFinderOptions.FavFile.time_format = '(%x %H:%M:%S)'
+"-----------------------------------------------------------------------------
+" [Directory Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.Dir.mode_available = 1
+" [Directory Mode] The items matching this are excluded from the completion
+" list.
+let g:FuzzyFinderOptions.Dir.excluded_path = '\v(^|[/\\])\.{1,2}[/\\]$'
+"-----------------------------------------------------------------------------
+" [Tag Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.Tag.mode_available = 1
+" [Tag Mode] The items matching this are excluded from the completion list.
+let g:FuzzyFinderOptions.Tag.excluded_path = '\v\~$|\.bak$|\.swp$'
+" [Tag Mode] If a number of matched items was over this, the completion
+" process is aborted.
+let g:FuzzyFinderOptions.Tag.matching_limit = 200
+"-----------------------------------------------------------------------------
+" [Tagged-File Mode] It disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.TaggedFile.mode_available = 1
+" [Tagged-File Mode] If a number of matched items was over this, the
+" completion process is aborted.
+let g:FuzzyFinderOptions.TaggedFile.matching_limit = 200
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" vim:fdm=marker
+" hidden options -------------------------------------------------------- {{{2
+let g:FuzzyFinderOptions.Base.info_version = 104
+let g:FuzzyFinderOptions.Base.path_separator = (has('win32') || has('win64') ? '\' : '/')
+let g:FuzzyFinderOptions.Base.prompt = '>'
+let g:FuzzyFinderOptions.Base.matching_rate_base = 10000000
+let g:FuzzyFinderOptions.Base.msg_rm_info = "==================================================\n" .
+      \                                     "  Your fuzzyfinder information file is no longer \n"  .
+      \                                     "  supported. Please remove\n"                         .
+      \                                     "  \"%s\".\n"                                          .
+      \                                     "=================================================="
 
+" overwrites default values of g:FuzzyFinderOptions with user-defined values - {{{2
+call map(user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
+call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
+" }}}2
+
+" INITIALIZATION: COMMANDS, AUTOCOMMANDS, ETC.: ========================= {{{1
+"-----------------------------------------------------------------------------
+augroup FuzzyFinderGlobalAutoCommand
+  autocmd!
+  autocmd BufEnter     * for m in s:GetAvailableModes() | call m.on_buf_enter() | endfor
+  autocmd BufWritePost * for m in s:GetAvailableModes() | call m.on_buf_write_post() | endfor
+augroup END
+
+command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
+command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
+
+
+" }}}1
+"=============================================================================
+" vim: set fdm=marker:
