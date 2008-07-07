@@ -1,12 +1,14 @@
 "=============================================================================
-" fuzzyfinder.vim : The fuzzy/partial pattern explorer for
+" fuzzyfinder.vim : Fuzzy/Partial pattern explorer for
 "                   buffer/file/MRU/command/favorite/tag/etc.
 "=============================================================================
 "
-" Author:  Takeshi Nishida <ns9tks(at)gmail(dot)com>
-" Version: 2.6, for Vim 7.1
+" Author:  Takeshi NISHIDA <ns9tks(at)gmail(dot)com>
+" Version: 2.6.1, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
+"
+" GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
 "=============================================================================
 " DOCUMENT: (Japanese: http://vim.g.hatena.ne.jp/keyword/fuzzyfinder.vim)
@@ -152,7 +154,7 @@
 "     default (~/.vimfuzzyfinder).
 
 "     :FuzzyFinderEditInfo command is helpful in editing your information
-"     file. This command read the information file in new unnamed buffer.
+"     file. This command reads the information file in new unnamed buffer.
 "     Close the buffer and the information file will be updated.
 "
 "   About Cache:
@@ -164,12 +166,12 @@
 "
 " Options: -------------------------------------------------------------- {{{1
 "   You can set options via g:FuzzyFinderOptions which is a dictionary. See
-"   the folded section named "INITIALIZATION: GLOBAL OPTIONS:" for details. To
-"   easily set options for customization, put necessary entries from GLOBAL
-"   OPTIONS into your vimrc file and edit those values.
+"   the folded section named "GLOBAL OPTIONS:" for details. To easily set
+"   options for customization, put necessary entries from GLOBAL OPTIONS into
+"   your vimrc file and edit those values.
 "
 " Setting Example: ------------------------------------------------------ {{{1
-"   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
+"   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'MruFile':{}, 'MruCmd':{}, 'FavFile':{}, 'Dir':{}, 'Tag':{}, 'TaggedFile':{}}
 "   let g:FuzzyFinderOptions.Base.ignore_case = 1
 "   let g:FuzzyFinderOptions.Base.abbrev_map  = {
 "         \   '\C^VR' : [
@@ -201,6 +203,10 @@
 "   Matt Tolton
 "
 " ChangeLog: ------------------------------------------------------------ {{{1
+"   2.6.1:
+"     - Fixed a bug related to floating-point support.
+"     - Added support for GetLatestVimScripts.
+"
 "   2.6:
 "     - Revived MRU-command mode. The problem with a command-line abbreviation
 "       was solved.
@@ -824,7 +830,7 @@ function! g:FuzzyFinderMode.Base.evaluate_matching_rate(expr, pattern)
     return self.matching_rate_base
   endif
 
-  let rate = 0.0
+  let rate = 0
   let rate_increment = (self.matching_rate_base * 9) / (len(a:pattern) * 10) " zero divide ok
   let matched = 1
 
@@ -1412,7 +1418,7 @@ endfunction
 
 " }}}1
 
-" INITIALIZATION: GLOBAL OPTIONS: ======================================= {{{1
+" GLOBAL OPTIONS: ======================================================= {{{1
 " stores user-defined g:FuzzyFinderOptions ------------------------------ {{{2
 let user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {})
 " }}}2
@@ -1531,7 +1537,7 @@ call map(user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
 call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
 " }}}2
 
-" INITIALIZATION: COMMANDS, MAPPINGS, AUTOCOMMANDS, ETC.: =============== {{{1
+" COMMANDS/AUTOCOMMANDS/MAPPINGS/ETC.: ================================== {{{1
 "-----------------------------------------------------------------------------
 augroup FuzzyfinderGlobal
   autocmd!
