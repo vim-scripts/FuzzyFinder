@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks(at)gmail(dot)com>
-" Version: 2.6.1, for Vim 7.1
+" Version: 2.6.2, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -203,6 +203,9 @@
 "   Matt Tolton
 "
 " ChangeLog: ------------------------------------------------------------ {{{1
+"   2.6.2:
+"     - Fixed not to miss changes in options when updates the MRU information.
+"
 "   2.6.1:
 "     - Fixed a bug related to floating-point support.
 "     - Added support for GetLatestVimScripts.
@@ -379,6 +382,7 @@ endfunction
 "-----------------------------------------------------------------------------
 function! s:OnCmdCR()
   for m in s:GetAvailableModes()
+    call m.extend_options()
     call m.on_command_pre(getcmdtype() . getcmdline())
   endfor
 
@@ -1541,8 +1545,8 @@ call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
 "-----------------------------------------------------------------------------
 augroup FuzzyfinderGlobal
   autocmd!
-  autocmd BufEnter     * for m in s:GetAvailableModes() | call m.on_buf_enter() | endfor
-  autocmd BufWritePost * for m in s:GetAvailableModes() | call m.on_buf_write_post() | endfor
+  autocmd BufEnter     * for m in s:GetAvailableModes() | call m.extend_options() | call m.on_buf_enter() | endfor
+  autocmd BufWritePost * for m in s:GetAvailableModes() | call m.extend_options() | call m.on_buf_write_post() | endfor
 augroup END
 
 " cnoremap has a problem, which doesn't expand cabbrev.
