@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.8, for Vim 7.1
+" Version: 2.8.1, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -214,6 +214,9 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.8.1:
+"     - Fixed a bug caused by the non-escaped buffer name "[Fuzzyfinder]".
+"     - Fixed a command to open in a new tab page in Buffer mode.
 "   2.8:
 "     - Added 'trim_length' option.
 "     - Added 'switch_order' option.
@@ -999,7 +1002,7 @@ function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   return [ ':buffer ',
         \  ':sbuffer ',
         \  ':vertical :sbuffer ',
-        \  ':tab :sbuffer',
+        \  ':tab :sbuffer ',
         \ ][a:mode] . buf . "\<CR>"
 endfunction
 
@@ -1080,6 +1083,7 @@ function! g:FuzzyFinderMode.MruCmd.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_open(expr, mode)
+  redraw
   " use feedkeys to remap <CR>
   return a:expr . [
         \   "\<C-r>=feedkeys(\"\\<CR>\", 'm')?'':''\<CR>",
@@ -1240,10 +1244,12 @@ function! s:WindowManager.activate(complete_func)
   let cwd = getcwd()
 
   if !bufexists(self.buf_nr)
-    leftabove 1new +file\ [Fuzzyfinder]
+    leftabove 1new
+    file \[Fuzzyfinder]
     let self.buf_nr = bufnr('%')
   elseif bufwinnr(self.buf_nr) == -1
-    execute 'leftabove 1split | buffer ' . self.buf_nr
+    leftabove 1split
+    execute self.buf_nr . 'buffer'
     delete _
   elseif bufwinnr(self.buf_nr) != bufwinnr('%')
     execute bufwinnr(self.buf_nr) . 'wincmd w'
