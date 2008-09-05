@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.8.1, for Vim 7.1
+" Version: 2.9, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -214,6 +214,14 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"
+"   2.9:
+"     - Enhanced <BS> behavior in Fuzzyfinder and added 'smart_bs' option.
+"     - Fixed a bug that entered pattern was not been escaped.
+"     - Fixed not to insert "zv" with "c/pattern<CR>" command in Normal mode
+"     - Avoid the slow down problem caused by filereadable() check for the MRU
+"       information in BufEnter/BufWritePost.
+"
 "   2.8.1:
 "     - Fixed a bug caused by the non-escaped buffer name "[Fuzzyfinder]".
 "     - Fixed a command to open in a new tab page in Buffer mode.
@@ -458,7 +466,7 @@ endfunction
 
 " 
 function! s:FilterMatching(entries, key, pattern, index, limit)
-  return s:FilterEx(a:entries, 'v:val[''' . a:key . '''] =~ ''' . a:pattern . ''' || v:val.index == ' . a:index, a:limit)
+  return s:FilterEx(a:entries, 'v:val[''' . a:key . '''] =~ ' . string(a:pattern) . ' || v:val.index == ' . a:index, a:limit)
 endfunction
 
 function! s:ExtendIndexToEach(in, offset)
@@ -580,9 +588,8 @@ function! s:OnCmdCR()
     call histadd(getcmdtype(), getcmdline())
   endif
 
-  let suffix = (getcmdtype() == '/' || getcmdtype() == '?' ? 'zv' : '' )
   " this is not mapped again (:help recursive_mapping)
-  return "\<CR>" . suffix
+  return "\<CR>"
 endfunction
 
 function! s:ExpandAbbrevMap(base, abbrev_map)
@@ -793,7 +800,11 @@ function! g:FuzzyFinderMode.Base.on_cr(index, check_dir)
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_bs()
-  call feedkeys((pumvisible() ? "\<C-e>\<BS>" : "\<BS>"), 'n')
+  let bs_count = 1
+  if self.smart_bs && col('.') > 2 && getline('.')[col('.') - 2] =~ '[/\\]'
+    let bs_count = len(matchstr(getline('.')[:col('.') - 3], '[^/\\]*$')) + 1
+  endif
+  call feedkeys((pumvisible() ? "\<C-e>" : "") . repeat("\<BS>", bs_count), 'n')
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_mode_enter()
@@ -1046,7 +1057,7 @@ function! g:FuzzyFinderMode.MruFile.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_mode_enter()
-  let self.cache = s:ExtendIndexToEach(map(copy(self.info),
+  let self.cache = s:ExtendIndexToEach(map(filter(copy(self.info), 'filereadable(v:val.path)'),
         \ '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }'), 1)
 endfunction
 
@@ -1059,17 +1070,16 @@ function! g:FuzzyFinderMode.MruFile.on_buf_write_post()
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.update_info()
+  if self.no_special_buffer && !empty(&buftype)
+    return
+  endif
   call s:InfoFileManager.load()
-
-  let item = {
-        \   'path' : (!self.no_special_buffer || empty(&buftype) ? expand('%:p') : ''),
-        \   'time' : localtime()
-        \ }
-
-  let self.info = filter(insert(filter(self.info,'v:val.path != item.path'), item),
-        \                'v:val.path !~ self.excluded_path && filereadable(v:val.path)'
+  let new_item = { 'path' : expand('%:p'), 'time' : localtime() }
+  let self.info = filter(insert(filter(self.info,
+        \                              'v:val.path != new_item.path'),
+        \                       new_item),
+        \                'v:val.path !~ self.excluded_path'
         \               )[0 : self.max_item - 1]
-
   call s:InfoFileManager.save()
 endfunction
 
@@ -1424,12 +1434,18 @@ let g:FuzzyFinderOptions.Base.migemo_support = 0
 "-----------------------------------------------------------------------------
 " [Buffer Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Buffer.mode_available = 1
+" [Buffer Mode] Pressing <BS> after a path separator deletes one directory
+" name if non-zero is set.
+let g:FuzzyFinderOptions.Buffer.smart_bs = 1
 " [Buffer Mode] This is used to sort modes for switching to the next/previous
 " mode.
 let g:FuzzyFinderOptions.Buffer.switch_order = 10
 "-----------------------------------------------------------------------------
 " [File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.File.mode_available = 1
+" [File Mode] Pressing <BS> after a path separator deletes one directory name
+" if non-zero is set.
+let g:FuzzyFinderOptions.File.smart_bs = 1
 " [File Mode] This is used to sort modes for switching to the next/previous
 " mode.
 let g:FuzzyFinderOptions.File.switch_order = 20
@@ -1441,6 +1457,9 @@ let g:FuzzyFinderOptions.File.matching_limit = 200
 "-----------------------------------------------------------------------------
 " [Directory Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Dir.mode_available = 1
+" [Directory Mode] Pressing <BS> after a path separator deletes one directory
+" name if non-zero is set.
+let g:FuzzyFinderOptions.Dir.smart_bs = 1
 " [Directory Mode] This is used to sort modes for switching to the
 " next/previous mode.
 let g:FuzzyFinderOptions.Dir.switch_order = 30
@@ -1450,6 +1469,9 @@ let g:FuzzyFinderOptions.Dir.excluded_path = '\v(^|[/\\])\.{1,2}[/\\]$'
 "-----------------------------------------------------------------------------
 " [Mru-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruFile.mode_available = 1
+" [Mru-File Mode] Pressing <BS> after a path separator deletes one directory
+" name if non-zero is set.
+let g:FuzzyFinderOptions.MruFile.smart_bs = 1
 " [Mru-File Mode] This is used to sort modes for switching to the
 " next/previous mode.
 let g:FuzzyFinderOptions.MruFile.switch_order = 40
@@ -1466,6 +1488,9 @@ let g:FuzzyFinderOptions.MruFile.max_item = 99
 "-----------------------------------------------------------------------------
 " [Mru-Cmd Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruCmd.mode_available = 1
+" [Mru-Cmd Mode] Pressing <BS> after a path separator deletes one directory
+" name if non-zero is set.
+let g:FuzzyFinderOptions.MruCmd.smart_bs = 0
 " [Mru-Cmd Mode] This is used to sort modes for switching to the next/previous
 " mode.
 let g:FuzzyFinderOptions.MruCmd.switch_order = 50
@@ -1481,6 +1506,9 @@ let g:FuzzyFinderOptions.MruCmd.max_item = 99
 " [Favorite-File Mode] This disables all functions of this mode if zero was
 " set.
 let g:FuzzyFinderOptions.FavFile.mode_available = 1
+" [Favorite-File Mode] Pressing <BS> after a path separator deletes one
+" directory name if non-zero is set.
+let g:FuzzyFinderOptions.FavFile.smart_bs = 1
 " [Favorite-File Mode] This is used to sort modes for switching to the
 " next/previous mode.
 let g:FuzzyFinderOptions.FavFile.switch_order = 60
@@ -1490,6 +1518,9 @@ let g:FuzzyFinderOptions.FavFile.time_format = '(%x %H:%M:%S)'
 "-----------------------------------------------------------------------------
 " [Tag Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Tag.mode_available = 1
+" [Tag Mode] Pressing <BS> after a path separator deletes one directory name
+" if non-zero is set.
+let g:FuzzyFinderOptions.Tag.smart_bs = 0
 " [Tag Mode] This is used to sort modes for switching to the next/previous
 " mode.
 let g:FuzzyFinderOptions.Tag.switch_order = 70
@@ -1501,6 +1532,9 @@ let g:FuzzyFinderOptions.Tag.matching_limit = 200
 "-----------------------------------------------------------------------------
 " [Tagged-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.TaggedFile.mode_available = 1
+" [Tagged-File Mode] Pressing <BS> after a path separator deletes one
+" directory name if non-zero is set.
+let g:FuzzyFinderOptions.TaggedFile.smart_bs = 0
 " [Tagged-File Mode] This is used to sort modes for switching to the
 " next/previous mode.
 let g:FuzzyFinderOptions.TaggedFile.switch_order = 80
