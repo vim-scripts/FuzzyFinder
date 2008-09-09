@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.9, for Vim 7.1
+" Version: 2.10, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -105,6 +105,9 @@
 "
 "     If you want to temporarily change whether or not to ignore case, use
 "     <C-t>. This key mapping is customizable.
+"
+"   To Hide The Completion Temporarily Menu In Fuzzyfinder:
+"     You can close it by <C-e> and reopen it by <C-x><C-u>.
 "
 "   About Highlighting:
 "     Fuzzyfinder highlights the buffer with "Error" group when the completion
@@ -214,11 +217,17 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.10:
+"     - Changed not to show a current buffer in a completion menu.
+"     - Fixed a bug that a filename to open was not been escaped.
+"     - Added 'prompt' option.
+"     - Added 'prompt_highlight' option.
+"     - Removed g:FuzzyFinderOptions.MruFile.no_special_buffer option.
 "
 "   2.9:
 "     - Enhanced <BS> behavior in Fuzzyfinder and added 'smart_bs' option.
 "     - Fixed a bug that entered pattern was not been escaped.
-"     - Fixed not to insert "zv" with "c/pattern<CR>" command in Normal mode
+"     - Fixed not to insert "zv" with "c/pattern<CR>" command in Normal mode.
 "     - Avoid the slow down problem caused by filereadable() check for the MRU
 "       information in BufEnter/BufWritePost.
 "
@@ -510,6 +519,10 @@ function! s:SplitPath(path)
         \ }
 endfunction
 
+function! s:EscapeFilename(fn)
+  return escape(a:fn, " \t\n*?[{`$%#'\"|!<")
+endfunction
+
 "-----------------------------------------------------------------------------
 " FUNCTIONS FOR COMPLETION ITEM:
 
@@ -650,9 +663,9 @@ function! s:ParseBufferLine(line)
 endfunction
 
 " returns a list of { index, ind, path }
-function! s:GetNonCurrentBuffers()
+function! s:GetNonCurrentBuffers(cur_bufnr)
   redir => bufs | silent buffers | redir END
-  return filter(map(split(bufs, "\n"), 's:ParseBufferLine(v:val)'), 'v:val.index != bufnr("%")')
+  return filter(map(split(bufs, "\n"), 's:ParseBufferLine(v:val)'), 'v:val.index != a:cur_bufnr')
 endfunction
 
 function! s:GetTagList(tagfile)
@@ -666,12 +679,14 @@ function! s:GetTaggedFileList(tagfile)
   return result
 endfunction
 
-function! s:HighlightError(error)
-  if a:error
-    syntax match Error  /^.*$/
-  else
-    syntax match Normal /^.*$/
-  endif
+function! s:HighlightPrompt(prompt, highlight)
+  syntax clear
+  execute printf('syntax match %s /^\V%s/', a:highlight, escape(a:prompt, '\'))
+endfunction
+
+function! s:HighlightError()
+  syntax clear
+  syntax match Error  /^.*$/
 endfunction
 
 function! s:CompareRanks(i1, i2)
@@ -697,10 +712,11 @@ endfunction
 "-----------------------------------------------------------------------------
 let g:FuzzyFinderMode = { 'Base' : {} }
 
-function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, tag_files)
+function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, prev_bufnr, tag_files)
   " initializes this object
   call self.extend_options()
   let self.partial_matching = a:partial_matching
+  let self.prev_bufnr = a:prev_bufnr
   let self.tag_files = a:tag_files " to get local value of current buffer
   let self.last_col = -1
   call s:InfoFileManager.load()
@@ -749,8 +765,9 @@ function! g:FuzzyFinderMode.Base.on_cursor_moved_i()
   let cl = col('.')
   if !self.exists_prompt(ln)
     " if command prompt is removed
-    call setline('.', self.prompt . ln)
-    call feedkeys(repeat("\<Right>", len(self.prompt)), 'n')
+    "call setline('.', self.prompt . ln)
+    call setline('.', self.restore_prompt(ln))
+    call feedkeys(repeat("\<Right>", len(getline('.')) - len(ln)), 'n')
   elseif cl <= len(self.prompt)
     " if the cursor is moved before command prompt
     call feedkeys(repeat("\<Right>", len(self.prompt) - cl + 1), 'n')
@@ -771,7 +788,7 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
     let m = self.next_mode(s:reserved_switch_mode < 0)
-    call m.launch(self.remove_prompt(text), self.partial_matching, self.tag_files)
+    call m.launch(self.remove_prompt(text), self.partial_matching, self.prev_bufnr, self.tag_files)
     unlet s:reserved_switch_mode
   else
     if exists('s:reserved_command')
@@ -819,7 +836,7 @@ function! g:FuzzyFinderMode.Base.on_open(expr, mode)
         \   ':split ',
         \   ':vsplit ',
         \   ':tabedit ',
-        \ ][a:mode] . escape(a:expr, ' ') . "\<CR>"
+        \ ][a:mode] . s:EscapeFilename(a:expr) . "\<CR>"
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_switch_mode(next_prev)
@@ -853,24 +870,18 @@ function! g:FuzzyFinderMode.Base.complete(findstart, base)
   elseif  !self.exists_prompt(a:base) || len(self.remove_prompt(a:base)) < self.min_length
     return []
   endif
-
-  call s:HighlightError(0)
-
+  call s:HighlightPrompt(self.prompt, self.prompt_highlight)
   " FIXME: ExpandAbbrevMap duplicates index
   let result = []
   for expanded_base in s:ExpandAbbrevMap(self.remove_prompt(a:base), self.abbrev_map)
     let result += self.on_complete(expanded_base)
   endfor
   call sort(result, 's:CompareRanks')
-
-  echo '[' . self.to_key() . ']'
-
   if empty(result)
-    call s:HighlightError(1)
+    call s:HighlightError()
   else
     call feedkeys("\<C-p>\<Down>", 'n')
   endif
-
   return result
 endfunction
 
@@ -991,30 +1002,30 @@ function! g:FuzzyFinderMode.Base.remove_prompt(in)
   return a:in[(self.exists_prompt(a:in) ? strlen(self.prompt) : 0):]
 endfunction
 
+function! g:FuzzyFinderMode.Base.restore_prompt(in)
+  return self.prompt . matchstr(a:in, '\%[' . self.prompt . ']\zs.*')
+endfunction
+
 "-----------------------------------------------------------------------------
 let g:FuzzyFinderMode.Buffer = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Buffer.on_complete(base)
   let patterns = self.make_pattern(a:base)
-  let result = s:FilterMatching(s:GetNonCurrentBuffers(), 'path', patterns.re, s:SuffixNumber(patterns.base), 0)
+  let result = s:FilterMatching(s:GetNonCurrentBuffers(self.prev_bufnr),
+        \                       'path', patterns.re, s:SuffixNumber(patterns.base), 0)
   return map(result, 's:FormatCompletionItem(v:val.path, v:val.index, v:val.ind . v:val.path, self.trim_length, "", a:base, 1)')
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " attempts to convert the path to the number for handling unnamed buffer
-  let buf = escape(a:expr, ' ')
-  for buf_info in s:GetNonCurrentBuffers()
-    if buf == escape(buf_info.path, ' ')
-      let buf = buf_info.index
-      break
-    endif
-  endfor
-
-  return [ ':buffer ',
-        \  ':sbuffer ',
-        \  ':vertical :sbuffer ',
-        \  ':tab :sbuffer ',
-        \ ][a:mode] . buf . "\<CR>"
+  " (bufnr("[No Name]") doesn't work.)
+  let bufnr = filter(s:GetNonCurrentBuffers(self.prev_bufnr), 'v:val.path == a:expr')[0].index
+  return printf([
+        \   ':%sbuffer',
+        \   ':%ssbuffer',
+        \   ':vertical :%ssbuffer',
+        \   ':tab :%ssbuffer',
+        \ ][a:mode] . "\<CR>", bufnr)
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1023,8 +1034,9 @@ let g:FuzzyFinderMode.File = copy(g:FuzzyFinderMode.Base)
 function! g:FuzzyFinderMode.File.on_complete(base)
   let patterns = map(s:SplitPath(a:base), 'self.make_pattern(v:val)')
   let result = self.glob_ex(patterns.head.base, patterns.tail.re, self.excluded_path, s:SuffixNumber(patterns.tail.base), self.matching_limit)
+  let result = filter(result, 'bufnr(v:val.path) != self.prev_bufnr')
   if len(result) >= self.matching_limit
-    call s:HighlightError(1)
+    call s:HighlightError()
   endif
   return map(result, 's:FormatCompletionItem(v:val.path, v:val.index, v:val.path, self.trim_length, "", a:base, 1)')
 endfunction
@@ -1057,8 +1069,10 @@ function! g:FuzzyFinderMode.MruFile.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_mode_enter()
-  let self.cache = s:ExtendIndexToEach(map(filter(copy(self.info), 'filereadable(v:val.path)'),
-        \ '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }'), 1)
+  let self.cache = filter(copy(self.info), 'filereadable(v:val.path)')
+  let self.cache = map(self.cache, '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
+  let self.cache = filter(self.cache, 'bufnr(v:val.path) != self.prev_bufnr')
+  let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_buf_enter()
@@ -1070,7 +1084,7 @@ function! g:FuzzyFinderMode.MruFile.on_buf_write_post()
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.update_info()
-  if self.no_special_buffer && !empty(&buftype)
+  if !empty(&buftype)
     return
   endif
   call s:InfoFileManager.load()
@@ -1133,8 +1147,9 @@ function! g:FuzzyFinderMode.FavFile.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.FavFile.on_mode_enter()
-  let self.cache = s:ExtendIndexToEach(map(copy(self.info),
-        \ '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }'), 1)
+  let self.cache = map(copy(self.info), '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
+  let self.cache = filter(self.cache, 'bufnr(v:val.path) != self.prev_bufnr')
+  let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
 function! g:FuzzyFinderMode.FavFile.add(in_file, adds)
@@ -1157,7 +1172,7 @@ function! g:FuzzyFinderMode.Tag.on_complete(base)
   let patterns = self.make_pattern(a:base)
   let result = self.find_tag(patterns.re, self.matching_limit)
   if len(result) >= self.matching_limit
-    call s:HighlightError(1)
+    call s:HighlightError()
   endif
   return map(result, 's:FormatCompletionItem(v:val, -1, v:val, self.trim_length, "", a:base, 1)')
 endfunction
@@ -1200,7 +1215,7 @@ function! g:FuzzyFinderMode.TaggedFile.on_complete(base)
   echo 'Making tagged file list...'
   let result = self.find_tagged_file(patterns.re, self.matching_limit)
   if len(result) >= self.matching_limit
-    call s:HighlightError(1)
+    call s:HighlightError()
   endif
   return map(result, 's:FormatCompletionItem(v:val, -1, v:val, self.trim_length, "", a:base, 1)')
 endfunction
@@ -1434,6 +1449,10 @@ let g:FuzzyFinderOptions.Base.migemo_support = 0
 "-----------------------------------------------------------------------------
 " [Buffer Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Buffer.mode_available = 1
+" [Buffer Mode] The prompt string.
+let g:FuzzyFinderOptions.Buffer.prompt = '>Buffer>'
+" [Buffer Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.Buffer.prompt_highlight = 'Question'
 " [Buffer Mode] Pressing <BS> after a path separator deletes one directory
 " name if non-zero is set.
 let g:FuzzyFinderOptions.Buffer.smart_bs = 1
@@ -1443,6 +1462,10 @@ let g:FuzzyFinderOptions.Buffer.switch_order = 10
 "-----------------------------------------------------------------------------
 " [File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.File.mode_available = 1
+" [File Mode] The prompt string.
+let g:FuzzyFinderOptions.File.prompt = '>File>'
+" [File Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.File.prompt_highlight = 'Question'
 " [File Mode] Pressing <BS> after a path separator deletes one directory name
 " if non-zero is set.
 let g:FuzzyFinderOptions.File.smart_bs = 1
@@ -1457,6 +1480,10 @@ let g:FuzzyFinderOptions.File.matching_limit = 200
 "-----------------------------------------------------------------------------
 " [Directory Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Dir.mode_available = 1
+" [Directory Mode] The prompt string.
+let g:FuzzyFinderOptions.Dir.prompt = '>Dir>'
+" [Directory Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.Dir.prompt_highlight = 'Question'
 " [Directory Mode] Pressing <BS> after a path separator deletes one directory
 " name if non-zero is set.
 let g:FuzzyFinderOptions.Dir.smart_bs = 1
@@ -1469,6 +1496,10 @@ let g:FuzzyFinderOptions.Dir.excluded_path = '\v(^|[/\\])\.{1,2}[/\\]$'
 "-----------------------------------------------------------------------------
 " [Mru-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruFile.mode_available = 1
+" [Mru-File Mode] The prompt string.
+let g:FuzzyFinderOptions.MruFile.prompt = '>MruFile>'
+" [Mru-File Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.MruFile.prompt_highlight = 'Question'
 " [Mru-File Mode] Pressing <BS> after a path separator deletes one directory
 " name if non-zero is set.
 let g:FuzzyFinderOptions.MruFile.smart_bs = 1
@@ -1478,8 +1509,6 @@ let g:FuzzyFinderOptions.MruFile.switch_order = 40
 " [Mru-File Mode] The items matching this are excluded from the completion
 " list.
 let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
-" [Mru-File Mode] Fuzzyfinder ignores special buffers if non-zero was set.
-let g:FuzzyFinderOptions.MruFile.no_special_buffer = 1
 " [Mru-File Mode] This is a string to format registered time. See :help
 " strftime() for details.
 let g:FuzzyFinderOptions.MruFile.time_format = '(%x %H:%M:%S)'
@@ -1488,6 +1517,10 @@ let g:FuzzyFinderOptions.MruFile.max_item = 99
 "-----------------------------------------------------------------------------
 " [Mru-Cmd Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruCmd.mode_available = 1
+" [Mru-Cmd Mode] The prompt string.
+let g:FuzzyFinderOptions.MruCmd.prompt = '>MruCmd>'
+" [Mru-Cmd Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.MruCmd.prompt_highlight = 'Question'
 " [Mru-Cmd Mode] Pressing <BS> after a path separator deletes one directory
 " name if non-zero is set.
 let g:FuzzyFinderOptions.MruCmd.smart_bs = 0
@@ -1506,6 +1539,10 @@ let g:FuzzyFinderOptions.MruCmd.max_item = 99
 " [Favorite-File Mode] This disables all functions of this mode if zero was
 " set.
 let g:FuzzyFinderOptions.FavFile.mode_available = 1
+" [Favorite-File Mode] The prompt string.
+let g:FuzzyFinderOptions.FavFile.prompt = '>FavFile>'
+" [Favorite-File Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.FavFile.prompt_highlight = 'Question'
 " [Favorite-File Mode] Pressing <BS> after a path separator deletes one
 " directory name if non-zero is set.
 let g:FuzzyFinderOptions.FavFile.smart_bs = 1
@@ -1518,6 +1555,10 @@ let g:FuzzyFinderOptions.FavFile.time_format = '(%x %H:%M:%S)'
 "-----------------------------------------------------------------------------
 " [Tag Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Tag.mode_available = 1
+" [Tag Mode] The prompt string.
+let g:FuzzyFinderOptions.Tag.prompt = '>Tag>'
+" [Tag Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.Tag.prompt_highlight = 'Question'
 " [Tag Mode] Pressing <BS> after a path separator deletes one directory name
 " if non-zero is set.
 let g:FuzzyFinderOptions.Tag.smart_bs = 0
@@ -1532,6 +1573,10 @@ let g:FuzzyFinderOptions.Tag.matching_limit = 200
 "-----------------------------------------------------------------------------
 " [Tagged-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.TaggedFile.mode_available = 1
+" [Tagged-File Mode] The prompt string.
+let g:FuzzyFinderOptions.TaggedFile.prompt = '>TaggedFile>'
+" [Tagged-File Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.TaggedFile.prompt_highlight = 'Question'
 " [Tagged-File Mode] Pressing <BS> after a path separator deletes one
 " directory name if non-zero is set.
 let g:FuzzyFinderOptions.TaggedFile.smart_bs = 0
@@ -1541,9 +1586,6 @@ let g:FuzzyFinderOptions.TaggedFile.switch_order = 80
 " [Tagged-File Mode] If a number of matched items was over this, the
 " completion process is aborted.
 let g:FuzzyFinderOptions.TaggedFile.matching_limit = 200
-
-" hidden options -------------------------------------------------------- {{{2
-let g:FuzzyFinderOptions.Base.prompt = '>'
 
 " overwrites default values of g:FuzzyFinderOptions with user-defined values - {{{2
 call map(user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
@@ -1567,14 +1609,14 @@ augroup END
 " cnoremap has a problem, which doesn't expand cabbrev.
 cmap <silent> <expr> <CR> <SID>OnCmdCR()
 
-command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderMruCmd      call g:FuzzyFinderMode.MruCmd.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch    (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch      (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch       (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch   (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderMruCmd      call g:FuzzyFinderMode.MruCmd.launch    (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch   (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch       (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=file   FuzzyFinderEditInfo    call s:InfoFileManager.edit()
 command! -bang -narg=? -complete=file   FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
 command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
