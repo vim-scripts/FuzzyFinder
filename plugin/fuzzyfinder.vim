@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.11, for Vim 7.1
+" Version: 2.12, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -217,6 +217,11 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.12:
+"     - Changed to be able to show completion items in the order of recently
+"       used in Buffer mode.
+"     - Added g:FuzzyFinderOptions.Buffer.mru_order option.
+"
 "   2.11:
 "     - Changed that a dot sequence of entered pattern is expanded to parent
 "       directroies in File/Dir mode.
@@ -664,22 +669,6 @@ function! s:EnumExpandedDirsEntries(dir, excluded)
   return entries
 endfunction
 
-" line of :buffer -> { index, ind, path }
-function! s:ParseBufferLine(line)
-  let parsed = matchlist(a:line, '^\s*\(\d*\)\([^"]*\)"\([^"]*\)".*$')
-  return  {
-        \   'index' : str2nr(parsed[1]),
-        \   'ind'   : parsed[2],
-        \   'path'  : fnamemodify(parsed[3], ':~:.')
-        \ }
-endfunction
-
-" returns a list of { index, ind, path }
-function! s:GetNonCurrentBuffers(cur_bufnr)
-  redir => bufs | silent buffers | redir END
-  return filter(map(split(bufs, "\n"), 's:ParseBufferLine(v:val)'), 'v:val.index != a:cur_bufnr')
-endfunction
-
 function! s:GetTagList(tagfile)
   return map(readfile(a:tagfile), 'matchstr(v:val, ''^[^!\t][^\t]*'')')
 endfunction
@@ -699,6 +688,10 @@ endfunction
 function! s:HighlightError()
   syntax clear
   syntax match Error  /^.*$/
+endfunction
+
+function! s:CompareTimeDescending(i1, i2)
+      return a:i1.time == a:i2.time ? 0 : a:i1.time > a:i2.time ? -1 : +1
 endfunction
 
 function! s:CompareRanks(i1, i2)
@@ -1027,21 +1020,50 @@ let g:FuzzyFinderMode.Buffer = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Buffer.on_complete(base)
   let patterns = self.make_pattern(a:base)
-  let result = s:FilterMatching(s:GetNonCurrentBuffers(self.prev_bufnr),
-        \                       'path', patterns.re, s:SuffixNumber(patterns.base), 0)
-  return map(result, 's:FormatCompletionItem(v:val.path, v:val.index, v:val.ind . v:val.path, self.trim_length, "", a:base, 1)')
+  let result = s:FilterMatching(self.cache, 'path', patterns.re, s:SuffixNumber(patterns.base), 0)
+  return map(result, 's:FormatCompletionItem(v:val.path, v:val.index, v:val.path, self.trim_length, v:val.time, a:base, 1)')
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " attempts to convert the path to the number for handling unnamed buffer
-  " (bufnr("[No Name]") doesn't work.)
-  let bufnr = filter(s:GetNonCurrentBuffers(self.prev_bufnr), 'v:val.path == a:expr')[0].index
   return printf([
         \   ':%sbuffer',
         \   ':%ssbuffer',
         \   ':vertical :%ssbuffer',
         \   ':tab :%ssbuffer',
-        \ ][a:mode] . "\<CR>", bufnr)
+        \ ][a:mode] . "\<CR>", filter(self.cache, 'v:val.path == a:expr')[0].buf_nr)
+endfunction
+
+function! g:FuzzyFinderMode.Buffer.on_mode_enter()
+  let self.cache = map(filter(range(1, bufnr('$')), 'buflisted(v:val) && v:val != self.prev_bufnr'),
+        \              'self.make_item(v:val)')
+  if self.mru_order
+    call s:ExtendIndexToEach(sort(self.cache, 's:CompareTimeDescending'), 1)
+  endif
+endfunction
+
+function! g:FuzzyFinderMode.Buffer.on_buf_enter()
+  call self.update_buf_times()
+endfunction
+
+function! g:FuzzyFinderMode.Buffer.on_buf_write_post()
+  call self.update_buf_times()
+endfunction
+
+function! g:FuzzyFinderMode.Buffer.update_buf_times()
+  if !exists('self.buf_times')
+    let self.buf_times = {}
+  endif
+  let self.buf_times[bufnr('%')] = localtime()
+endfunction
+
+function! g:FuzzyFinderMode.Buffer.make_item(nr)
+  return  {
+        \   'index'  : a:nr,
+        \   'buf_nr' : a:nr,
+        \   'path'   : empty(bufname(a:nr)) ? '[No Name]' : fnamemodify(bufname(a:nr), ':~:.'),
+        \   'time'   : (exists('self.buf_times[a:nr]') ? strftime(self.time_format, self.buf_times[a:nr]) : ''),
+        \ }
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1456,6 +1478,9 @@ let g:FuzzyFinderOptions.Base.min_length = 0
 let g:FuzzyFinderOptions.Base.abbrev_map = {}
 " [All Mode] Fuzzyfinder ignores case in search patterns if non-zero is set.
 let g:FuzzyFinderOptions.Base.ignore_case = 1
+" [All Mode] This is a string to format time string. See :help strftime() for
+" details.
+let g:FuzzyFinderOptions.Base.time_format = '(%x %H:%M:%S)'
 " [All Mode] If a length of completion item is more than this, it is trimmed
 " when shown in completion menu.
 let g:FuzzyFinderOptions.Base.trim_length = 80
@@ -1474,6 +1499,9 @@ let g:FuzzyFinderOptions.Buffer.prompt_highlight = 'Question'
 " [Buffer Mode] Pressing <BS> after a path separator deletes one directory
 " name if non-zero is set.
 let g:FuzzyFinderOptions.Buffer.smart_bs = 1
+" [Buffer Mode] The completion items is sorted in the order of recently used
+" if non-zero is set.
+let g:FuzzyFinderOptions.Buffer.mru_order = 1
 " [Buffer Mode] This is used to sort modes for switching to the next/previous
 " mode.
 let g:FuzzyFinderOptions.Buffer.switch_order = 10
@@ -1527,9 +1555,6 @@ let g:FuzzyFinderOptions.MruFile.switch_order = 40
 " [Mru-File Mode] The items matching this are excluded from the completion
 " list.
 let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
-" [Mru-File Mode] This is a string to format registered time. See :help
-" strftime() for details.
-let g:FuzzyFinderOptions.MruFile.time_format = '(%x %H:%M:%S)'
 " [Mru-File Mode] This is an upper limit of MRU items to be stored.
 let g:FuzzyFinderOptions.MruFile.max_item = 99
 "-----------------------------------------------------------------------------
@@ -1548,9 +1573,6 @@ let g:FuzzyFinderOptions.MruCmd.switch_order = 50
 " [Mru-Cmd Mode] The items matching this are excluded from the completion
 " list.
 let g:FuzzyFinderOptions.MruCmd.excluded_command = '^$'
-" [Mru-Cmd Mode] This is a string to format registered time. See :help
-" strftime() for details.
-let g:FuzzyFinderOptions.MruCmd.time_format = '(%x %H:%M:%S)'
 " [Mru-Cmd Mode] This is an upper limit of MRU items to be stored.
 let g:FuzzyFinderOptions.MruCmd.max_item = 99
 "-----------------------------------------------------------------------------
@@ -1567,9 +1589,6 @@ let g:FuzzyFinderOptions.FavFile.smart_bs = 1
 " [Favorite-File Mode] This is used to sort modes for switching to the
 " next/previous mode.
 let g:FuzzyFinderOptions.FavFile.switch_order = 60
-" [Favorite-File Mode] This is a string to format registered time. See :help
-" strftime() for details.
-let g:FuzzyFinderOptions.FavFile.time_format = '(%x %H:%M:%S)'
 "-----------------------------------------------------------------------------
 " [Tag Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Tag.mode_available = 1
