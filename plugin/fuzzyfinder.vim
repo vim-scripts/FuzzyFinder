@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.12, for Vim 7.1
+" Version: 2.13, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -128,10 +128,15 @@
 "     project mode.
 "
 "   About Usage Of Command Argument:
-"     As an example, if you want to launch file-mode Fuzzyfinder with the
-"     directory of current buffer and not current directory, map like below:
+"     As an example, if you want to launch file-mode Fuzzyfinder with the full
+"     path of current directory, map like below:
 "
-"       nnoremap <C-m> :FuzzyFinderFile <C-r>=expand('%:~:.')[:-1-len(expand('%:~:.:t'))]<CR><CR>
+"       nnoremap <C-p> :FuzzyFinderFile <C-r>=fnamemodify(getcwd(), ':p')<CR><CR>
+"
+"     Instead, if you want the directory of current buffer and not current
+"     directory:
+"
+"       nnoremap <C-p> :FuzzyFinderFile <C-r>=expand('%:~:.')[:-1-len(expand('%:~:.:t'))]<CR><CR>
 "
 "   About Abbreviations And Multiple Search:
 "     You can use abbreviations and multiple search in each mode. For example,
@@ -217,6 +222,10 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.13:
+"     - Fixed a bug that a directory disappeared when a file in that directroy
+"       was being opened in File/Mru-File mode.
+"
 "   2.12:
 "     - Changed to be able to show completion items in the order of recently
 "       used in Buffer mode.
@@ -494,6 +503,14 @@ function! s:ExtendIndexToEach(in, offset)
     let a:in[i].index = i + a:offset
   endfor
   return a:in
+endfunction
+
+function! s:UpdateMruList(mrulist, new_item, key, max_item, excluded)
+  let result = copy(a:mrulist)
+  let result = filter(result,'v:val[a:key] != a:new_item[a:key]')
+  let result = insert(result, a:new_item)
+  let result = filter(result, 'v:val[a:key] !~ a:excluded')
+  return result[0 : a:max_item - 1]
 endfunction
 
 "-----------------------------------------------------------------------------
@@ -1073,7 +1090,7 @@ function! g:FuzzyFinderMode.File.on_complete(base)
   let base = s:ExpandTailDotSequenceToParentDir(a:base)
   let patterns = map(s:SplitPath(base), 'self.make_pattern(v:val)')
   let result = self.glob_ex(patterns.head.base, patterns.tail.re, self.excluded_path, s:SuffixNumber(patterns.tail.base), self.matching_limit)
-  let result = filter(result, 'bufnr(v:val.path) != self.prev_bufnr')
+  let result = filter(result, 'bufnr("^" . v:val.path . "$") != self.prev_bufnr')
   if len(result) >= self.matching_limit
     call s:HighlightError()
   endif
@@ -1109,9 +1126,10 @@ function! g:FuzzyFinderMode.MruFile.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_mode_enter()
-  let self.cache = filter(copy(self.info), 'filereadable(v:val.path)')
+  let self.cache = copy(self.info)
+  let self.cache = filter(self.cache, 'bufnr("^" . v:val.path . "$") != self.prev_bufnr')
+  let self.cache = filter(self.cache, 'filereadable(v:val.path)')
   let self.cache = map(self.cache, '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
-  let self.cache = filter(self.cache, 'bufnr(v:val.path) != self.prev_bufnr')
   let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
@@ -1124,16 +1142,13 @@ function! g:FuzzyFinderMode.MruFile.on_buf_write_post()
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.update_info()
+  "if !empty(&buftype) || !filereadable(expand('%'))
   if !empty(&buftype)
     return
   endif
   call s:InfoFileManager.load()
-  let new_item = { 'path' : expand('%:p'), 'time' : localtime() }
-  let self.info = filter(insert(filter(self.info,
-        \                              'v:val.path != new_item.path'),
-        \                       new_item),
-        \                'v:val.path !~ self.excluded_path'
-        \               )[0 : self.max_item - 1]
+  let self.info = s:UpdateMruList(self.info, { 'path' : expand('%:p'), 'time' : localtime() },
+        \                         'path', self.max_item, self.excluded_path)
   call s:InfoFileManager.save()
 endfunction
 
@@ -1168,12 +1183,8 @@ endfunction
 
 function! g:FuzzyFinderMode.MruCmd.update_info(cmd)
   call s:InfoFileManager.load()
-
-  let item = { 'command' : a:cmd, 'time' : localtime() }
-
-  let self.info = filter(insert(filter(self.info,'v:val.command != item.command'), item),
-        \                'v:val.command !~ self.excluded_command')[0 : self.max_item - 1]
-
+  let self.info = s:UpdateMruList(self.info, { 'command' : a:cmd, 'time' : localtime() },
+        \                         'command', self.max_item, self.excluded_command)
   call s:InfoFileManager.save()
 endfunction
 
@@ -1187,8 +1198,9 @@ function! g:FuzzyFinderMode.FavFile.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.FavFile.on_mode_enter()
-  let self.cache = map(copy(self.info), '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
-  let self.cache = filter(self.cache, 'bufnr(v:val.path) != self.prev_bufnr')
+  let self.cache = copy(self.info)
+  let self.cache = filter(self.cache, 'bufnr("^" . v:val.path . "$") != self.prev_bufnr')
+  let self.cache = map(self.cache, '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
   let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
@@ -1310,7 +1322,7 @@ function! s:WindowManager.activate(complete_func)
 
   if !bufexists(self.buf_nr)
     leftabove 1new
-    file \[Fuzzyfinder]
+    file `='[Fuzzyfinder]'`
     let self.buf_nr = bufnr('%')
   elseif bufwinnr(self.buf_nr) == -1
     leftabove 1split
@@ -1391,7 +1403,8 @@ endfunction
 
 function! s:InfoFileManager.edit()
 
-  new +file\ [FuzzyfinderInfo]
+  new
+  file `='[FuzzyfinderInfo]'`
   let self.bufnr = bufnr('%')
 
   setlocal filetype=vim
