@@ -1,10 +1,10 @@
 "=============================================================================
 " fuzzyfinder.vim : Fuzzy/Partial pattern explorer for
-"                   buffer/file/MRU/command/favorite/tag/etc.
+"                   buffer/file/MRU/command/bookmark/tag/etc.
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.14, for Vim 7.1
+" Version: 2.15, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -39,11 +39,11 @@
 "     - Buffer mode
 "     - File mode
 "     - Directory mode (yet another :cd command)
-"     - MRU-file mode (most recently used files)
-"     - MRU-command mode (most recently used command-lines)
-"     - Favorite-file mode
+"     - MRU-File mode (most recently used files)
+"     - MRU-Command mode (most recently used command-lines)
+"     - Bookmark mode
 "     - Tag mode (yet another :tag command)
-"     - Tagged-file mode (files which are included in current tags)
+"     - Tagged-File mode (files which are included in current tags)
 "
 "   Fuzzyfinder supports the multibyte.
 "
@@ -56,14 +56,14 @@
 "   Starting Fuzzyfinder:
 "     You can start Fuzzyfinder by the following commands:
 "
-"       :FuzzyFinderBuffer      - launchs buffer-mode Fuzzyfinder.
-"       :FuzzyFinderFile        - launchs file-mode Fuzzyfinder.
-"       :FuzzyFinderDir         - launchs directory-mode Fuzzyfinder.
-"       :FuzzyFinderMruFile     - launchs MRU-file-mode Fuzzyfinder.
-"       :FuzzyFinderMruCmd      - launchs MRU-command-mode Fuzzyfinder.
-"       :FuzzyFinderFavFile     - launchs favorite-file-mode Fuzzyfinder.
-"       :FuzzyFinderTag         - launchs tag-mode Fuzzyfinder.
-"       :FuzzyFinderTaggedFile  - launchs tagged-file-mode Fuzzyfinder.
+"       :FuzzyFinderBuffer      - launchs Fuzzyfinder as Buffer mode.
+"       :FuzzyFinderFile        - launchs Fuzzyfinder as File mode.
+"       :FuzzyFinderDir         - launchs Fuzzyfinder as Directory mode.
+"       :FuzzyFinderMruFile     - launchs Fuzzyfinder as MRU-File mode.
+"       :FuzzyFinderMruCmd      - launchs Fuzzyfinder as MRU-Command mode.
+"       :FuzzyFinderBookmark    - launchs Fuzzyfinder as Bookmark mode.
+"       :FuzzyFinderTag         - launchs Fuzzyfinder as Tag mode.
+"       :FuzzyFinderTaggedFile  - launchs Fuzzyfinder as Tagged-File mode.
 "
 "     It is recommended to map these commands. These commands can take initial
 "     text as a command argument. The text will be entered after Fuzzyfinder
@@ -80,8 +80,8 @@
 "     length of entered pattern is more than setting value. By default, it is
 "     shown at the beginning.
 "
-"     If too many items (200, by default) were matched, the completion is
-"     aborted to reduce nonresponse.
+"     The number of items shown in the completion menu is limited (50, by
+"     default) to speed up the response time.
 "
 "     If an item were matched with entered pattern exactly, it is shown first.
 "     The item whose file name has longer prefix matching is placed upper.
@@ -95,8 +95,6 @@
 "       <C-j> - opens in a split window.
 "       <C-k> - opens in a vertical-split window.
 "       <C-]> - opens in a new tab page.
-"     In MRU-command mode, <CR> executes a selected command and others just
-"     put it into a command-line. These key mappings are customizable.
 "
 "     To cancel and return to previous window, leave Insert mode.
 "
@@ -155,15 +153,24 @@
 "       "~/project/**/src/*t*x*t*"
 "       ".vim/plugin/*t*x*t*"
 "
-"   Adding Favorite Files:
-"     You can add a favorite file by the following commands:
+"   About Bookmark Mode:
+"     You can jump to a line you have added to bookmarks beforehand.
+"     Fuzzyfinder adjusts a line number for jump. If a line of bookmarked
+"     position does not match to a pattern when the bookmark was added,
+"     Fuzzyfinder searches a matching line around bookmarked position. So you
+"     can jump to a bookmarked line even if the line is out of bookmarked
+"     position. If you want to jump to bookmarked line number, set
+"     g:FuzzyFinderOptions.Bookmark.searching_range option to 0.
 "
-"       :FuzzyFinderAddFavFile {filename}
+"   Adding Bookmark:
+"     You can add a cursor line to bookmarks by the following commands:
 "
-"     If you do not specify the filename, current file name is used.
+"       :FuzzyFinderAddBookmark
+"
+"     Execute that command and you will be prompted to enter a bookmark name.
 "
 "   About Information File:
-"     Fuzzyfinder writes information of the MRU, favorite, etc to the file by
+"     Fuzzyfinder writes information of the MRU, bookmark, etc to the file by
 "     default (~/.vimfuzzyfinder).
 
 "     :FuzzyFinderEditInfo command is helpful in editing your information
@@ -187,7 +194,7 @@
 "
 "-----------------------------------------------------------------------------
 " Setting Example:
-"   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'FavFile':{}, 'Tag':{}, 'TaggedFile':{}}
+"   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'Bookmark':{}, 'Tag':{}, 'TaggedFile':{}}
 "   let g:FuzzyFinderOptions.Base.ignore_case = 1
 "   let g:FuzzyFinderOptions.Base.abbrev_map  = {
 "         \   '\C^VR' : [
@@ -205,11 +212,11 @@
 "   nnoremap <silent> <C-k>      :FuzzyFinderMruCmd<CR>
 "   nnoremap <silent> <C-p>      :FuzzyFinderDir <C-r>=expand('%:p:~')[:-1-len(expand('%:p:~:t'))]<CR><CR>
 "   nnoremap <silent> <C-f><C-d> :FuzzyFinderDir<CR>
-"   nnoremap <silent> <C-f><C-f> :FuzzyFinderFavFile<CR>
+"   nnoremap <silent> <C-b>      :FuzzyFinderBookmark<CR>
 "   nnoremap <silent> <C-f><C-t> :FuzzyFinderTag!<CR>
 "   nnoremap <silent> <C-f><C-g> :FuzzyFinderTaggedFile<CR>
 "   noremap  <silent> g]         :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
-"   nnoremap <silent> <C-f>F     :FuzzyFinderAddFavFile<CR>
+"   nnoremap <silent> <C-f>b     :FuzzyFinderAddBookmark<CR>
 "   nnoremap <silent> <C-f><C-e> :FuzzyFinderEditInfo<CR>
 "
 "-----------------------------------------------------------------------------
@@ -223,6 +230,11 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.15:
+"     - Added Bookmark mode.
+"     - Removed Favorite-file mode. Use Bookmark mode instead.
+"     - Fixed not to record a entry of input() in MRU-Command mode.
+"
 "   2.14:
 "     - Changed to show buffer status in Buffer mode.
 "     - Fixed a bug that an error occurs when nonexistent buffer-name was
@@ -603,6 +615,51 @@ function! s:EvaluateMatchingRate(expr, pattern)
   return rate
 endfunction
 
+" FUNCTIONS: COMMANDLINE ------------------------------------------------ {{{1
+
+function! s:EchoHl(msg, hl)
+  execute "echohl " . a:hl
+  echo a:msg
+  echohl None
+endfunction
+
+function! s:InputHl(prompt, text, hl)
+  execute "echohl " . a:hl
+  let s = input(a:prompt, a:text)
+  echohl None
+  return s
+endfunction
+
+
+" FUNCTIONS: EXPLORER WINDOW -------------------------------------------- {{{1
+
+function! s:HighlightPrompt(prompt, highlight)
+  syntax clear
+  execute printf('syntax match %s /^\V%s/', a:highlight, escape(a:prompt, '\'))
+endfunction
+
+function! s:HighlightError()
+  syntax clear
+  syntax match Error  /^.*$/
+endfunction
+
+" FUNCTIONS: TAG -------------------------------------------------------- {{{1
+
+function! s:GetTagList(tagfile)
+  return map(readfile(a:tagfile), 'matchstr(v:val, ''^[^!\t][^\t]*'')')
+endfunction
+
+function! s:GetTaggedFileList(tagfile)
+  execute 'cd ' . fnamemodify(a:tagfile, ':h')
+  let result = map(readfile(a:tagfile), 'fnamemodify(matchstr(v:val, ''^[^!\t][^\t]*\t\zs[^\t]\+''), '':p:~'')')
+  cd -
+  return result
+endfunction
+
+function! s:GetCurrentTagFiles()
+  return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
+endfunction
+
 " FUNCTIONS: MISC ------------------------------------------------------- {{{1
 
 function! s:IsAvailableMode(mode)
@@ -629,10 +686,7 @@ function! s:OnCmdCR()
     call m.on_command_pre(getcmdtype() . getcmdline())
   endfor
   " lets last entry become the newest in the history
-  if getcmdtype() =~ '[:/=@]'
-    call histadd(getcmdtype(), getcmdline())
-  endif
-
+  call histadd(getcmdtype(), getcmdline())
   " this is not mapped again (:help recursive_mapping)
   return "\<CR>"
 endfunction
@@ -696,25 +750,14 @@ function! s:GetBufIndicator(nr)
   endif
 endfunction
 
-function! s:GetTagList(tagfile)
-  return map(readfile(a:tagfile), 'matchstr(v:val, ''^[^!\t][^\t]*'')')
+function! s:ExtendPathRelative(dict)
+  let a:dict.path = fnamemodify(a:dict.path, ':~:.')
+  return a:dict
 endfunction
 
-function! s:GetTaggedFileList(tagfile)
-  execute 'cd ' . fnamemodify(a:tagfile, ':h')
-  let result = map(readfile(a:tagfile), 'fnamemodify(matchstr(v:val, ''^[^!\t][^\t]*\t\zs[^\t]\+''), '':p:~'')')
-  cd -
-  return result
-endfunction
-
-function! s:HighlightPrompt(prompt, highlight)
-  syntax clear
-  execute printf('syntax match %s /^\V%s/', a:highlight, escape(a:prompt, '\'))
-endfunction
-
-function! s:HighlightError()
-  syntax clear
-  syntax match Error  /^.*$/
+function! s:ExtendTimeFormatted(dict, format)
+  let a:dict.time = strftime(a:format, a:dict.time)
+  return a:dict
 endfunction
 
 function! s:CompareTimeDescending(i1, i2)
@@ -734,8 +777,45 @@ function! s:CompareRanks(i1, i2)
   return 0
 endfunction
 
-function! s:GetCurrentTagFiles()
-  return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
+" opens a:path and jumps to the line equal to a:pattern from a:lnum within
+" a:range. if not found, jumps to a:lnum.
+function! s:JumpToBookmark(path, mode, pattern, lnum, range)
+  call s:OpenFile(a:path, a:mode)
+  let ln = a:lnum
+  for i in range(0, a:range)
+    if getline(a:lnum + i) ==# a:pattern
+      let ln = a:lnum + i
+      break
+    elseif getline(a:lnum - i) ==# a:pattern
+      let ln = a:lnum - i
+      break
+    endif
+  endfor
+  call cursor(ln, 0)
+  normal zvzz
+endfunction
+
+function! s:OpenBuffer(nr, mode)
+  execute printf([
+        \   ':%sbuffer',
+        \   ':%ssbuffer',
+        \   ':vertical :%ssbuffer',
+        \   ':tab :%ssbuffer',
+        \ ][a:mode], a:nr)
+endfunction
+
+function! s:OpenFile(path, mode)
+  let nr = bufnr('^' . a:path . '$')
+  if nr > -1
+    call s:OpenBuffer(nr, a:mode)
+  else
+    execute [
+          \   ':edit ',
+          \   ':split ',
+          \   ':vsplit ',
+          \   ':tabedit ',
+          \ ][a:mode] . s:EscapeFilename(a:path)
+  endif
 endfunction
 
 " }}}1
@@ -755,6 +835,9 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, prev_buf
     echo 'This mode is not available: ' . self.to_str()
     return
   endif
+
+  " before create window
+  call self.on_mode_enter()
 
   call s:WindowManager.activate(self.make_complete_func('CompleteFunc'))
   call s:OptionManager.set('completeopt', 'menuone')
@@ -783,8 +866,6 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching, prev_buf
     execute printf('inoremap <buffer> <silent> %s <C-r>=%s ? "" : ""<CR>', lhs, rhs)
   endfor
 
-  call self.on_mode_enter()
-
   " Starts Insert mode and makes CursorMovedI event now. Command prompt is
   " needed to forces a completion menu to update every typing.
   call setline(1, self.prompt . a:initial_text)
@@ -810,23 +891,20 @@ function! g:FuzzyFinderMode.Base.on_cursor_moved_i()
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_insert_leave()
-  let text = getline('.')
-  call self.on_mode_leave()
-  call self.empty_cache_if_existed(0)
+  let line = getline('.')
   call s:OptionManager.restore_all()
   call s:WindowManager.deactivate()
-
+  if exists('s:reserved_command')
+    call self.on_open(s:reserved_command[0], s:reserved_command[1])
+    unlet s:reserved_command
+  endif
+  call self.on_mode_leave()
+  call self.empty_cache_if_existed(0)
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
     let m = self.next_mode(s:reserved_switch_mode < 0)
-    call m.launch(self.remove_prompt(text), self.partial_matching, self.prev_bufnr, self.tag_files)
+    call m.launch(self.remove_prompt(line), self.partial_matching, self.prev_bufnr, self.tag_files)
     unlet s:reserved_switch_mode
-  else
-    if exists('s:reserved_command')
-      call feedkeys(self.on_open(s:reserved_command[0], s:reserved_command[1]), 'n')
-      unlet s:reserved_command
-      redraw!
-    endif
   endif
 endfunction
 
@@ -844,7 +922,7 @@ function! g:FuzzyFinderMode.Base.on_cr(index, check_dir)
     call feedkeys(printf("\<C-y>\<C-r>=%s(%d, 1) ? '' : ''\<CR>", self.to_str('on_cr'), a:index), 'n')
   elseif !a:check_dir || getline('.') !~ '[/\\]$'
     let s:reserved_command = [self.remove_prompt(getline('.')), a:index]
-    call feedkeys("\<Esc>", 'n')
+    call feedkeys("\<Esc>", 'n') " stopinsert behavior is strange...
   endif
 endfunction
 
@@ -863,17 +941,12 @@ function! g:FuzzyFinderMode.Base.on_mode_leave()
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_open(expr, mode)
-  return [
-        \   ':edit ',
-        \   ':split ',
-        \   ':vsplit ',
-        \   ':tabedit ',
-        \ ][a:mode] . s:EscapeFilename(a:expr) . "\<CR>"
+  call s:OpenFile(a:expr, a:mode)
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_switch_mode(next_prev)
   let s:reserved_switch_mode = a:next_prev
-  call feedkeys("\<Esc>", 'n')
+  call feedkeys("\<Esc>", 'n') " stopinsert behavior is strange...
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_switch_ignore_case()
@@ -990,9 +1063,6 @@ endfunction
 function! g:FuzzyFinderMode.Base.empty_cache_if_existed(force)
   if exists('self.cache') && (a:force || !exists('self.lasting_cache') || !self.lasting_cache)
     unlet self.cache
-    "let self.cache = (type(self.cache) == type({}) ? {} :
-    "      \           type(self.cache) == type([]) ? [] :
-    "      \           type(self.cache) == type('') ? '' : 0)
   endif
 endfunction
 
@@ -1052,15 +1122,9 @@ endfunction
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " filter the selected item to get the buffer number for handling unnamed buffer
   call filter(self.cache, 'v:val.path == a:expr')
-  if empty(self.cache)
-    return ''
+  if !empty(self.cache)
+    call s:OpenBuffer(self.cache[0].buf_nr, a:mode)
   endif
-  return printf([
-        \   ':%sbuffer',
-        \   ':%ssbuffer',
-        \   ':vertical :%ssbuffer',
-        \   ':tab :%ssbuffer',
-        \ ][a:mode] . "\<CR>", self.cache[0].buf_nr)
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_mode_enter()
@@ -1097,6 +1161,10 @@ function! g:FuzzyFinderMode.Buffer.make_item(nr)
         \ }
 endfunction
 
+"  'edit'/'split'/'vsplit'/'tabedit'
+function! g:FuzzyFinderMode.Buffer.jump_to(item, cmd_open)
+endfunction
+
 " OBJECT: g:FuzzyFinderMode.File ---------------------------------------- {{{1
 let g:FuzzyFinderMode.File = copy(g:FuzzyFinderMode.Base)
 
@@ -1119,12 +1187,7 @@ function! g:FuzzyFinderMode.Dir.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.Dir.on_open(expr, mode)
-  return ':cd ' . escape(a:expr, ' ') . [
-        \   "\<CR>",
-        \   "",
-        \   "",
-        \   "",
-        \ ][a:mode]
+  execute ':cd ' . s:EscapeFilename(a:expr)
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.MruFile ------------------------------------- {{{1
@@ -1140,7 +1203,7 @@ function! g:FuzzyFinderMode.MruFile.on_mode_enter()
   let self.cache = copy(self.info)
   let self.cache = filter(self.cache, 'bufnr("^" . v:val.path . "$") != self.prev_bufnr')
   let self.cache = filter(self.cache, 'filereadable(v:val.path)')
-  let self.cache = map(self.cache, '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
+  let self.cache = map(self.cache, 's:ExtendPathRelative(s:ExtendTimeFormatted(v:val, self.time_format))')
   let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
@@ -1173,22 +1236,21 @@ function! g:FuzzyFinderMode.MruCmd.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_open(expr, mode)
-  " use feedkeys to remap <CR>
-  return a:expr . [
-        \   "\<C-r>=feedkeys(\"\\<CR>\", 'm')?'':''\<CR>",
-        \   "",
-        \   "",
-        \   "",
-        \ ][a:mode]
+  call self.update_info(a:expr)
+  call histadd(a:expr[0], a:expr[1:])
+  call feedkeys(a:expr . "\<CR>", 'n')
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_mode_enter()
-  let self.cache = s:ExtendIndexToEach(map(copy(self.info),
-        \ '{ "command" : v:val.command, "time" : strftime(self.time_format, v:val.time) }'), 1)
+  let self.cache = copy(self.info)
+  let self.cache = map(self.cache, 's:ExtendTimeFormatted(v:val, self.time_format)')
+  let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_command_pre(cmd)
-  call self.update_info(a:cmd)
+  if getcmdtype() =~ '^[:/?]'
+    call self.update_info(a:cmd)
+  endif
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.update_info(cmd)
@@ -1198,30 +1260,46 @@ function! g:FuzzyFinderMode.MruCmd.update_info(cmd)
   call s:InfoFileManager.save()
 endfunction
 
-" OBJECT: g:FuzzyFinderMode.FavFile ------------------------------------- {{{1
-let g:FuzzyFinderMode.FavFile = copy(g:FuzzyFinderMode.Base)
+" OBJECT: g:FuzzyFinderMode.Bookmark ------------------------------------- {{{1
+let g:FuzzyFinderMode.Bookmark = copy(g:FuzzyFinderMode.Base)
 
-function! g:FuzzyFinderMode.FavFile.on_complete(base)
+function! g:FuzzyFinderMode.Bookmark.on_complete(base)
   let patterns = self.make_pattern(a:base)
-  let result = s:FilterMatching(self.cache, 'path', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
-  return map(result, 's:FormatCompletionItem(v:val.path, v:val.index, v:val.path, self.trim_length, v:val.time, a:base, 1)')
+  let result = s:FilterMatching(self.cache, 'name', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:FormatCompletionItem(v:val.name, v:val.index, v:val.name, self.trim_length, v:val.time, a:base, 0)')
 endfunction
 
-function! g:FuzzyFinderMode.FavFile.on_mode_enter()
+function! g:FuzzyFinderMode.Bookmark.on_open(expr, mode)
+  call filter(self.cache, 'v:val.name ==# a:expr')
+  if empty(self.cache)
+    return ''
+  endif
+  call s:JumpToBookmark(self.cache[0].path, a:mode, self.cache[0].pattern, self.cache[0].lnum, self.searching_range)
+endfunction
+
+function! g:FuzzyFinderMode.Bookmark.on_mode_enter()
   let self.cache = copy(self.info)
-  let self.cache = filter(self.cache, 'bufnr("^" . v:val.path . "$") != self.prev_bufnr')
-  let self.cache = map(self.cache, '{ "path" : fnamemodify(v:val.path, ":~:."), "time" : strftime(self.time_format, v:val.time) }')
+  let self.cache = map(self.cache, 's:ExtendPathRelative(s:ExtendTimeFormatted(v:val, self.time_format))')
   let self.cache = s:ExtendIndexToEach(self.cache, 1)
 endfunction
 
-function! g:FuzzyFinderMode.FavFile.add(in_file, adds)
+function! g:FuzzyFinderMode.Bookmark.bookmark_here(name)
+  if !empty(&buftype) || expand('%') !~ '\S'
+    call s:EchoHl('Can''t bookmark this buffer.', 'WarningMsg')
+    return
+  endif
   call s:InfoFileManager.load()
 
-  let file = fnamemodify((empty(a:in_file) ? expand('%') : a:in_file), ':p:~')
-
-  call filter(self.info, 'v:val.path != file')
-  if a:adds
-    call add(self.info, { 'path' : file, 'time' : localtime() })
+  let item = { 'path' : expand('%:p:~'), 'lnum' : line('.'), 'pattern' : getline('.'), 'time' : localtime() }
+  if a:name =~ '\S'
+    let item.name = a:name
+  else
+    let item.name = s:InputHl('Bookmark as:', pathshorten(item.path) . '|' . item.lnum . '| ' . item.pattern, 'Question')
+  endif
+  if item.name =~ '\S'
+    call insert(self.info, item)
+  else
+    call s:EchoHl('Canceled', 'WarningMsg')
   endif
 
   call s:InfoFileManager.save()
@@ -1237,12 +1315,12 @@ function! g:FuzzyFinderMode.Tag.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.Tag.on_open(expr, mode)
-  return [
+  execute [
         \   ':tjump ',
         \   ':stjump ',
         \   ':vertical :stjump ',
         \   ':tab :stjump ',
-        \ ][a:mode] . a:expr . "\<CR>"
+        \ ][a:mode] . a:expr
 endfunction
 
 function! g:FuzzyFinderMode.Tag.find_tag(pattern, limit)
@@ -1321,7 +1399,7 @@ endfunction
 let s:WindowManager = { 'buf_nr' : -1 }
 
 function! s:WindowManager.activate(complete_func)
-  let self.prev_winnr = winnr()
+  "let self.prev_winnr = winnr()
   let cwd = getcwd()
 
   if !bufexists(self.buf_nr)
@@ -1351,20 +1429,21 @@ function! s:WindowManager.activate(complete_func)
 
   redraw " for 'lazyredraw'
 
-  " suspend autocomplpop.vim
   if exists(':AutoComplPopLock')
+    " suspend autocomplpop.vim
     :AutoComplPopLock
   endif
 endfunction
 
 function! s:WindowManager.deactivate()
-  " resume autocomplpop.vim
   if exists(':AutoComplPopUnlock')
+    " resume autocomplpop.vim
     :AutoComplPopUnlock
   endif
-
-  close
-  execute self.prev_winnr . 'wincmd w'
+  "close
+  "execute self.prev_winnr . 'wincmd w'
+  wincmd p
+  execute self.buf_nr . 'bdelete'
 endfunction
 
 " OBJECT: s:InfoFileManager --------------------------------------------- {{{1
@@ -1463,7 +1542,7 @@ let user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {})
 " }}}2
 
 " Initializes g:FuzzyFinderOptions.
-let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'FavFile':{}, 'Tag':{}, 'TaggedFile':{}}
+let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'Bookmark':{}, 'Tag':{}, 'TaggedFile':{}}
 "-----------------------------------------------------------------------------
 " [All Mode] This is mapped to select completion item or finish input and
 " open a buffer/file in previous window.
@@ -1593,19 +1672,21 @@ let g:FuzzyFinderOptions.MruCmd.excluded_command = '^$'
 " [Mru-Cmd Mode] This is an upper limit of MRU items to be stored.
 let g:FuzzyFinderOptions.MruCmd.max_item = 99
 "-----------------------------------------------------------------------------
-" [Favorite-File Mode] This disables all functions of this mode if zero was
-" set.
-let g:FuzzyFinderOptions.FavFile.mode_available = 1
-" [Favorite-File Mode] The prompt string.
-let g:FuzzyFinderOptions.FavFile.prompt = '>FavFile>'
-" [Favorite-File Mode] The highlight group name for a prompt string.
-let g:FuzzyFinderOptions.FavFile.prompt_highlight = 'Question'
-" [Favorite-File Mode] Pressing <BS> after a path separator deletes one
-" directory name if non-zero is set.
-let g:FuzzyFinderOptions.FavFile.smart_bs = 1
-" [Favorite-File Mode] This is used to sort modes for switching to the
+" [Bookmark Mode] This disables all functions of this mode if zero was set.
+let g:FuzzyFinderOptions.Bookmark.mode_available = 1
+" [Bookmark Mode] The prompt string.
+let g:FuzzyFinderOptions.Bookmark.prompt = '>Bookmark>'
+" [Bookmark Mode] The highlight group name for a prompt string.
+let g:FuzzyFinderOptions.Bookmark.prompt_highlight = 'Question'
+" [Bookmark Mode] Pressing <BS> after a path separator deletes one directory
+" name if non-zero is set.
+let g:FuzzyFinderOptions.Bookmark.smart_bs = 0
+" [Bookmark Mode] This is used to sort modes for switching to the
 " next/previous mode.
-let g:FuzzyFinderOptions.FavFile.switch_order = 60
+let g:FuzzyFinderOptions.Bookmark.switch_order = 60
+" [Bookmark Mode] Fuzzyfinder searches a matching line from bookmarked
+" position within this number of lines.
+let g:FuzzyFinderOptions.Bookmark.searching_range = 100
 "-----------------------------------------------------------------------------
 " [Tag Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Tag.mode_available = 1
@@ -1662,11 +1743,11 @@ command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinde
 command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch       (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch   (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=file   FuzzyFinderMruCmd      call g:FuzzyFinderMode.MruCmd.launch    (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
-command! -bang -narg=? -complete=file   FuzzyFinderFavFile     call g:FuzzyFinderMode.FavFile.launch   (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
+command! -bang -narg=? -complete=file   FuzzyFinderBookmark    call g:FuzzyFinderMode.Bookmark.launch  (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch       (<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>), bufnr('%'), s:GetCurrentTagFiles())
 command! -bang -narg=? -complete=file   FuzzyFinderEditInfo    call s:InfoFileManager.edit()
-command! -bang -narg=? -complete=file   FuzzyFinderAddFavFile  call g:FuzzyFinderMode.FavFile.add(<q-args>, 1)
+command! -bang -narg=? -complete=file   FuzzyFinderAddBookmark call g:FuzzyFinderMode.Bookmark.bookmark_here(<q-args>)
 command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
 
 " }}}1
