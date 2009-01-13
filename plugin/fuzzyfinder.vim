@@ -4,7 +4,7 @@
 "=============================================================================
 "
 " Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.17, for Vim 7.1
+" Version: 2.18, for Vim 7.1
 " Licence: MIT Licence
 " URL:     http://www.vim.org/scripts/script.php?script_id=1984
 "
@@ -73,23 +73,26 @@
 "
 "
 "   In Fuzzyfinder:
-"     A entered pattern is converted to a fuzzy pattern and buffers/files
-"     which match the pattern is shown in a completion menu.
+"     An entered pattern is converted to a fuzzy pattern and items which match
+"     the pattern is shown in a completion menu.
 "
 "     A completion menu is shown when you type at an end of a line and the
-"     length of entered pattern is more than setting value. By default, it is
-"     shown at the beginning.
+"     length of the entered pattern is more than setting value. By default, it
+"     is shown at the beginning.
 "
 "     The number of items shown in the completion menu is limited (50, by
 "     default) to speed up the response time.
 "
-"     If an item were matched with entered pattern exactly, it is shown first.
-"     A item which has longer prefix matching is placed upper. An item which
-"     matched more sequentially has more priority. A item whose index were
-"     matched with a number suffixed with entered pattern is placed upper.
+"     Fuzzyfinder sorts completion items with some rules:
+"       - A perfect matching puts first.
+"       - A sequential matching puts higher than a fragmentary matching.
+"       - A backward matching puts higher than a forward matching.
+"       - A short item is put higher than a long item.
+"
 "     Plus, Fuzzyfinder has a learning system. An item which has been
-"     completed in the past with a current pattern is placed upper. The first
-"     item in the completion menu will be selected automatically.
+"     completed in the past with a current pattern is placed upper.
+"
+"     The first item in the completion menu will be selected automatically.
 "
 "     You can open a selected item in various ways:
 "       <CR>  - opens in a previous window.
@@ -231,6 +234,11 @@
 "
 "-----------------------------------------------------------------------------
 " ChangeLog:
+"   2.18:
+"     - Improved rules for the sorting of completion items.
+"     - Changed not to learn a completion if an entered pattern is empty.
+"     - Fixed a bug that Buffer mode did not work. Thanks ryo7000.
+"
 "   2.17:
 "     - Introduced a learning system for the sorting of completion items.
 "     - Added g:FuzzyFinderOptions.Base.learning_limit option.
@@ -604,36 +612,47 @@ endfunction
 
 " FUNCTIONS: COMPLETION ITEM: ------------------------------------------- {{{1
 
+" returns [v(1), v(2), ..., v(n) ] , v(1)==1 , v(i) < v(i+1) , v(1) > v(n)/2
+function! s:MakeAscendingValues(n, total)
+  let values = range(a:n, a:n * 2 - 1)
+  let sum = 0
+  for val in values
+    let sum += val
+  endfor
+  return map(values, 'v:val * a:total / sum')
+endfunction
+
 " a range of return value is [0, s:MATCHING_RATE_BASE]
 function! s:EvaluateMatchingRate(word, base)
-  let rate_increment = s:MATCHING_RATE_BASE / len(a:word) " zero divide ok
   let rate = 0
-  let matched = 1
+  let scores = s:MakeAscendingValues(len(a:word), s:MATCHING_RATE_BASE)
+  let matched = 0
+  let skip_penalty = 1
   let i_base = 0
   for i_word in range(len(a:word))
-    if a:word[i_word] == a:base[i_base]
-      let rate += rate_increment
+    if i_base >= len(a:base)
+      let skip_penalty = skip_penalty * 2
+      break
+    elseif a:word[i_word] == a:base[i_base]
+      let rate += scores[i_word]
       let matched = 1
       let i_base += 1
-      if i_base >= len(a:base)
-        break
-      endif
     elseif matched
-      let rate_increment = rate_increment / 2
+      let skip_penalty = skip_penalty * 2
       let matched = 0
     endif
   endfor
-  return rate
+  return rate / skip_penalty
 endfunction
 
 " 
-function! s:EvaluateLearningRank(word, filtered_stats)
-  for i in range(len(a:filtered_stats))
-    if a:filtered_stats[i].word ==# a:word
+function! s:EvaluateLearningRank(word, stats)
+  for i in range(len(a:stats))
+    if a:stats[i].word ==# a:word
       return i
     endif
   endfor
-  return len(a:filtered_stats)
+  return len(a:stats)
 endfunction
 
 
@@ -778,18 +797,18 @@ function! s:SetFormattedTimeAsMenu(item, format)
   return a:item
 endfunction
 
-function! s:SetRanks(item, base, is_path, filtered_stats)
-  let eval_word = (a:is_path ? a:item.word : s:SplitPath(matchstr(a:item.word, '^.*[^/\\]')).tail)
-  let eval_base = (a:is_path ? a:base : s:SplitPath(a:base).tail)
-  let rank_perfect = (eval_word == eval_base ? 0 : 1)
-  if eval_word == eval_base
+function! s:SetRanks(item, eval_word, eval_base, stats)
+  "let eval_word = (a:is_path ? s:SplitPath(matchstr(a:item.word, '^.*[^/\\]')).tail : a:item.word)
+  "let eval_base = (a:is_path ? s:SplitPath(a:base).tail : a:base)
+  let rank_perfect = (a:eval_word == a:eval_base ? 0 : 1)
+  if a:eval_word == a:eval_base
     let rank_perfect = 1
     let rank_matching = 0
   else
     let rank_perfect = 2
-    let rank_matching = -s:EvaluateMatchingRate(eval_word, eval_base)
+    let rank_matching = -s:EvaluateMatchingRate(a:eval_word, a:eval_base)
   endif
-  let a:item.ranks = [ rank_perfect, s:EvaluateLearningRank(a:item.word, a:filtered_stats), rank_matching, a:item.index ]
+  let a:item.ranks = [ rank_perfect, s:EvaluateLearningRank(a:item.word, a:stats), rank_matching, a:item.index ]
   return a:item
 endfunction
 
@@ -954,7 +973,9 @@ function! g:FuzzyFinderMode.Base.on_cr(index, dir_check)
     call feedkeys(printf("\<C-y>\<C-r>=%s(%d, 1) ? '' : ''\<CR>", self.to_str('on_cr'), a:index), 'n')
     return
   endif
-  call self.add_stats(self.last_base, s:RemovePrompt(getline('.'), self.prompt))
+  if !empty(self.last_base)
+    call self.add_stat(self.last_base, s:RemovePrompt(getline('.'), self.prompt))
+  endif
   if a:dir_check && getline('.') =~ '[/\\]$'
     return
   endif
@@ -1013,13 +1034,14 @@ function! g:FuzzyFinderMode.Base.deserialize_info(lines)
         \              'eval(v:val[len(header_data ) :])')
   let self.stats = map(filter(copy(a:lines), 'v:val[: len(header_stats) - 1] ==# header_stats'),
         \              'eval(v:val[len(header_stats) :])')
+  call filter(self.stats, '!empty(v:val.base)') " NOTE: remove this line someday
 endfunction
 
-function! g:FuzzyFinderMode.Base.add_stats(base, word)
+function! g:FuzzyFinderMode.Base.add_stat(base, word)
   call s:InfoFileManager.load()
-  let new_item = { 'base' : a:base, 'word' : a:word }
-  call filter(self.stats, 'v:val !=# new_item')
-  call insert(self.stats, new_item)
+  let stat = { 'base' : a:base, 'word' : a:word }
+  call filter(self.stats, 'v:val !=# stat')
+  call insert(self.stats, stat)
   let self.stats = self.stats[0 : self.learning_limit - 1]
   call s:InfoFileManager.save()
 endfunction
@@ -1082,6 +1104,10 @@ function! g:FuzzyFinderMode.Base.make_pattern(base)
   endif
 endfunction
 
+function! g:FuzzyFinderMode.Base.get_filtered_stats(base)
+  return filter(copy(self.stats), 'v:val.base ==# a:base')
+endfunction
+
 function! g:FuzzyFinderMode.Base.empty_cache_if_existed(force)
   if exists('self.cache') && (a:force || !exists('self.lasting_cache') || !self.lasting_cache)
     unlet self.cache
@@ -1120,10 +1146,11 @@ endfunction
 let g:FuzzyFinderMode.Buffer = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Buffer.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
+  let base_tail = s:SplitPath(a:base).tail
+  let stats = self.get_filtered_stats(a:base)
   let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "abbr", self.trim_length), a:base, 1, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, base_tail, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
@@ -1140,6 +1167,7 @@ function! g:FuzzyFinderMode.Buffer.on_mode_enter_post()
   if self.mru_order
     call s:MapToSetSerialIndex(sort(self.items, 's:CompareTimeDescending'), 1)
   endif
+  call map(self.items, 's:SetFormattedAbbr(v:val, "abbr", self.trim_length)')
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_buf_enter()
@@ -1151,20 +1179,20 @@ function! g:FuzzyFinderMode.Buffer.on_buf_write_post()
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.update_buf_times()
-  if !exists('self.buf_times')
-    let self.buf_times = {}
-  endif
+  call extend(self, { 'buf_times' : {} }, 'keep')
   let self.buf_times[bufnr('%')] = localtime()
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.make_item(nr)
   let path = (empty(bufname(a:nr)) ? '[No Name]' : fnamemodify(bufname(a:nr), ':~:.'))
+  let time = (exists('self.buf_times[a:nr]') ? self.buf_times[a:nr] : 0)
   return  {
         \   'index'  : a:nr,
         \   'buf_nr' : a:nr,
         \   'word'   : path,
         \   'abbr'   : s:GetBufIndicator(a:nr) . ' ' . path,
-        \   'menu'   : (exists('self.buf_times[a:nr]') ? strftime(self.time_format, self.buf_times[a:nr]) : ''),
+        \   'menu'   : strftime(self.time_format, time),
+        \   'time'   : time,
         \ }
 endfunction
 
@@ -1176,12 +1204,12 @@ endfunction
 let g:FuzzyFinderMode.File = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.File.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let base = s:ExpandTailDotSequenceToParentDir(a:base)
   let patterns = map(s:SplitPath(base), 'self.make_pattern(v:val)')
+  let stats = self.get_filtered_stats(a:base)
   let result = self.cached_glob(patterns.head.base, patterns.tail.re, self.excluded_path, s:SuffixNumber(patterns.tail.base), self.enumerating_limit)
   let result = filter(result, 'bufnr("^" . v:val.word . "$") != self.prev_bufnr')
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 1, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, patterns.tail.base, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.File.cached_glob(dir, file, excluded, index, limit)
@@ -1193,19 +1221,20 @@ function! g:FuzzyFinderMode.File.cached_glob(dir, file, excluded, index, limit)
     call s:MapToSetSerialIndex(self.cache[key], 1)
   endif
   echo 'Filtering file list...'
-  return map(s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit),
-        \ '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }')
+  let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
+  call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)') 
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.Dir ----------------------------------------- {{{1
 let g:FuzzyFinderMode.Dir = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Dir.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let base = s:ExpandTailDotSequenceToParentDir(a:base)
   let patterns = map(s:SplitPath(base), 'self.make_pattern(v:val)')
+  let stats = self.get_filtered_stats(a:base)
   let result = self.cached_glob_dir(patterns.head.base, patterns.tail.re, self.excluded_path, s:SuffixNumber(patterns.tail.base), self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 1, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, patterns.tail.base, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.Dir.on_open(expr, mode)
@@ -1223,18 +1252,20 @@ function! g:FuzzyFinderMode.Dir.cached_glob_dir(dir, file, excluded, index, limi
     call s:MapToSetSerialIndex(self.cache[key], 1)
   endif
   echo 'Filtering file list...'
-  return map(s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit),
-        \ '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }')
+  let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
+  call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)') 
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.MruFile ------------------------------------- {{{1
 let g:FuzzyFinderMode.MruFile = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.MruFile.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
+  let base_tail = s:SplitPath(a:base).tail
+  let stats = self.get_filtered_stats(a:base)
   let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 1, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, base_tail, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_mode_enter_post()
@@ -1242,6 +1273,7 @@ function! g:FuzzyFinderMode.MruFile.on_mode_enter_post()
   let self.items = map(self.items, 'self.format_item_using_cache(v:val)')
   let self.items = filter(self.items, '!empty(v:val)')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_buf_enter()
@@ -1294,10 +1326,10 @@ endfunction
 let g:FuzzyFinderMode.MruCmd = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.MruCmd.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
+  let stats = self.get_filtered_stats(a:base)
   let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 0, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, v:val.word, a:base, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_open(expr, mode)
@@ -1310,6 +1342,7 @@ function! g:FuzzyFinderMode.MruCmd.on_mode_enter_post()
   let self.items = copy(self.data)
   let self.items = map(self.items, 's:SetFormattedTimeAsMenu(v:val, self.time_format)')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_command_pre(cmd)
@@ -1329,10 +1362,10 @@ endfunction
 let g:FuzzyFinderMode.Bookmark = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Bookmark.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
+  let stats = self.get_filtered_stats(a:base)
   let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 0, filterd_stats)')
+  return map(result, 's:SetRanks(v:val, v:val.word, a:base, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.Bookmark.on_open(expr, mode)
@@ -1347,6 +1380,7 @@ function! g:FuzzyFinderMode.Bookmark.on_mode_enter_post()
   let self.items = copy(self.data)
   let self.items = map(self.items, 's:SetWordToRelativePath(s:SetFormattedTimeAsMenu(v:val, self.time_format))')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
 endfunction
 
 function! g:FuzzyFinderMode.Bookmark.bookmark_here(word)
@@ -1376,10 +1410,10 @@ endfunction
 let g:FuzzyFinderMode.Tag = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.Tag.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
-  let result = self.find_tag(patterns.re, self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 0, filterd_stats)')
+  let stats = self.get_filtered_stats(a:base)
+  let result = self.find_tag(patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:SetRanks(v:val, v:val.word, a:base, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.Tag.on_open(expr, mode)
@@ -1395,7 +1429,7 @@ function! g:FuzzyFinderMode.Tag.on_mode_enter_pre()
   let self.tag_files = s:GetCurrentTagFiles()
 endfunction
 
-function! g:FuzzyFinderMode.Tag.find_tag(pattern, limit)
+function! g:FuzzyFinderMode.Tag.find_tag(pattern, index, limit)
   if !len(self.tag_files)
     return []
   endif
@@ -1409,25 +1443,27 @@ function! g:FuzzyFinderMode.Tag.find_tag(pattern, limit)
     let self.cache[key] = { 'time'  : localtime(), 'items' : items }
   endif
   echo 'Filtering tag list...'
-  return s:FilterEx(self.cache[key].items, 'v:val.word =~ ' . string(a:pattern), a:limit)
+  let result = s:FilterMatching(self.cache[key].items, 'word', a:pattern, a:index, a:limit)
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.TaggedFile ---------------------------------- {{{1
 let g:FuzzyFinderMode.TaggedFile = copy(g:FuzzyFinderMode.Base)
 
 function! g:FuzzyFinderMode.TaggedFile.on_complete(base)
-  let filterd_stats = filter(copy(self.stats), 'v:val.base ==# a:base')
   let patterns = self.make_pattern(a:base)
+  let base_tail = s:SplitPath(a:base).tail
+  let stats = self.get_filtered_stats(a:base)
   echo 'Making tagged file list...'
-  let result = self.find_tagged_file(patterns.re, self.enumerating_limit)
-  return map(result,'s:SetRanks(s:SetFormattedAbbr(v:val, "word", self.trim_length), a:base, 1, filterd_stats)')
+  let result = self.find_tagged_file(patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, base_tail, stats)')
 endfunction
 
 function! g:FuzzyFinderMode.TaggedFile.on_mode_enter_pre()
   let self.tag_files = s:GetCurrentTagFiles()
 endfunction
 
-function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, limit)
+function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, index, limit)
   if !len(self.tag_files)
     return []
   endif
@@ -1444,7 +1480,8 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, limit)
   for item in self.cache[key].items
     let item.word = fnamemodify(item.word, ':.')
   endfor
-  return s:FilterEx(self.cache[key].items, 'v:val.word =~ ' . string(a:pattern), a:limit)
+  let result = s:FilterMatching(self.cache[key].items, 'word', a:pattern, a:index, a:limit)
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
 endfunction
 
 " OBJECT: s:OptionManager ----------------------------------------------- {{{1
@@ -1786,7 +1823,7 @@ call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
 " COMMANDS/AUTOCOMMANDS/MAPPINGS/ETC.: {{{1
 
 let s:PATH_SEPARATOR = (has('win32') || has('win64') ? '\' : '/')
-let s:MATCHING_RATE_BASE = 10000000
+let s:MATCHING_RATE_BASE = 1000000
 let s:ABBR_TRIM_MARK = '...'
 
 augroup FuzzyfinderGlobal
