@@ -1,475 +1,12 @@
 "=============================================================================
-" fuzzyfinder.vim : Fuzzy/Partial pattern explorer for
-"                   buffer/file/MRU/command/bookmark/tag/etc.
-"=============================================================================
-"
-" Author:  Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version: 2.19, for Vim 7.1
-" Licence: MIT Licence
-" URL:     http://www.vim.org/scripts/script.php?script_id=1984
-"
+" File:                plugin/fuzzyfinder.vim
+" Author:              Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
+" Version:             2.20, for Vim 7.1
+" Licence:             MIT Licence
 " GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
-"=============================================================================
-" DOCUMENT: {{{1
-"   Japanese: http://vim.g.hatena.ne.jp/keyword/fuzzyfinder.vim
+" See doc/fuzzyfinder.txt for details.
 "
-"-----------------------------------------------------------------------------
-" Description:
-"   Fuzzyfinder provides convenient ways to quickly reach the buffer/file you
-"   want. Fuzzyfinder finds matching files/buffers with a fuzzy/partial
-"   pattern to which it converted the entered pattern.
-"
-"   E.g.: entered pattern -> fuzzy pattern / partial pattern
-"         abc             -> *a*b*c*       / *abc*
-"         a?c             -> *a?c*         / *a?c*
-"         dir/file        -> dir/*f*i*l*e* / dir/*file*
-"         d*r/file        -> d*r/*f*i*l*e* / d*r/*file*
-"         ../**/s         -> ../**/*s*     / ../**/*s*
-"
-"     (** allows searching a directory tree.)
-"
-"   You will be happy when:
-"     "./OhLongLongLongLongLongFile.txt"
-"     "./AhLongLongLongLongLongName.txt"
-"     "./AhLongLongLongLongLongFile.txt" <- you want :O
-"     Type "AF" and "AhLongLongLongLongLongFile.txt" will be select. :D
-"
-"   Fuzzyfinder has some modes:
-"     - Buffer mode
-"     - File mode
-"     - Directory mode (yet another :cd command)
-"     - MRU-File mode (most recently used files)
-"     - MRU-Command mode (most recently used command-lines)
-"     - Bookmark mode
-"     - Tag mode (yet another :tag command)
-"     - Tagged-File mode (files which are included in current tags)
-"
-"   Fuzzyfinder supports the multibyte.
-"
-"-----------------------------------------------------------------------------
-" Installation:
-"   Drop this file in your plugin directory.
-"
-"-----------------------------------------------------------------------------
-" Usage:
-"   Starting Fuzzyfinder:
-"     You can start Fuzzyfinder by the following commands:
-"
-"       :FuzzyFinderBuffer      - launchs Fuzzyfinder as Buffer mode.
-"       :FuzzyFinderFile        - launchs Fuzzyfinder as File mode.
-"       :FuzzyFinderDir         - launchs Fuzzyfinder as Directory mode.
-"       :FuzzyFinderMruFile     - launchs Fuzzyfinder as MRU-File mode.
-"       :FuzzyFinderMruCmd      - launchs Fuzzyfinder as MRU-Command mode.
-"       :FuzzyFinderBookmark    - launchs Fuzzyfinder as Bookmark mode.
-"       :FuzzyFinderTag         - launchs Fuzzyfinder as Tag mode.
-"       :FuzzyFinderTaggedFile  - launchs Fuzzyfinder as Tagged-File mode.
-"
-"     It is recommended to map these commands. These commands can take initial
-"     text as a command argument. The text will be entered after Fuzzyfinder
-"     launched. If a command was executed with a ! modifier (e.g.
-"     :FuzzyFinderTag!), it enables the partial matching instead of the fuzzy
-"     matching.
-"
-"
-"   In Fuzzyfinder:
-"     An entered pattern is converted to a fuzzy pattern and items which match
-"     the pattern is shown in a completion menu.
-"
-"     A completion menu is shown when you type at an end of a line and the
-"     length of the entered pattern is more than setting value. By default, it
-"     is shown at the beginning.
-"
-"     The number of items shown in the completion menu is limited (50, by
-"     default) to speed up the response time.
-"
-"     Fuzzyfinder sorts completion items with some rules:
-"       - A perfect matching puts first.
-"       - A sequential matching puts higher than a fragmentary matching.
-"       - A backward matching puts higher than a forward matching.
-"       - A short item is put higher than a long item.
-"
-"     Plus, Fuzzyfinder has a learning system. An item which has been
-"     completed in the past with a current pattern is placed upper.
-"
-"     The first item in the completion menu will be selected automatically.
-"
-"     You can open a selected item in various ways:
-"       <CR>  - opens in a previous window.
-"       <C-j> - opens in a split window.
-"       <C-k> - opens in a vertical-split window.
-"       <C-]> - opens in a new tab page.
-"
-"     To cancel and return to previous window, leave Insert mode.
-"
-"     To Switch the mode without leaving Insert mode, use <C-l> or <C-o>.
-"     This key mapping is customizable.
-"
-"     If you want to temporarily change whether or not to ignore case, use
-"     <C-t>. This key mapping is customizable.
-"
-"   To Hide The Completion Menu Temporarily In Fuzzyfinder:
-"     You can close it by <C-e> and reopen it by <C-x><C-u>.
-"
-"   About Highlighting:
-"     Fuzzyfinder highlights the buffer with "Error" group when the number of
-"     completion items found is 0 or over enumerating_limit.
-"
-"   About Alternative Approach For Tag Jump:
-"     Following mappings are replacements for :tag and <C-]>:
-"
-"       nnoremap <silent> <C-f><C-t> :FuzzyFinderTag!<CR>
-"       nnoremap <silent> <C-]>      :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
-"
-"     In the tag mode, it is recommended to use partial matching instead of
-"     fuzzy matching.
-"
-"   About Tagged File Mode:
-"     The files which are included in the current tags are the ones which are
-"     related to the current working environment. So this mode is a pseudo
-"     project mode.
-"
-"   About Usage Of Command Argument:
-"     As an example, if you want to launch file-mode Fuzzyfinder with the full
-"     path of current directory, map like below:
-"
-"       nnoremap <C-p> :FuzzyFinderFile <C-r>=fnamemodify(getcwd(), ':p')<CR><CR>
-"
-"     Instead, if you want the directory of current buffer and not current
-"     directory:
-"
-"       nnoremap <C-p> :FuzzyFinderFile <C-r>=expand('%:~:.')[:-1-len(expand('%:~:.:t'))]<CR><CR>
-"
-"   About Abbreviations And Multiple Search:
-"     You can use abbreviations and multiple search in each mode. For example,
-"     set as below:
-"
-"       let g:FuzzyFinderOptions.Base.abbrev_map  = {
-"             \   "^WORK" : [
-"             \     "~/project/**/src/",
-"             \     ".vim/plugin/",
-"             \   ],
-"             \ }
-"
-"     And type "WORKtxt" in file-mode Fuzzyfinder, then it searches by
-"     following patterns:
-"
-"       "~/project/**/src/*t*x*t*"
-"       ".vim/plugin/*t*x*t*"
-"
-"   About Bookmark Mode:
-"     You can jump to a line you have added to bookmarks beforehand.
-"     Fuzzyfinder adjusts a line number for jump. If a line of bookmarked
-"     position does not match to a pattern when the bookmark was added,
-"     Fuzzyfinder searches a matching line around bookmarked position. So you
-"     can jump to a bookmarked line even if the line is out of bookmarked
-"     position. If you want to jump to bookmarked line number, set
-"     g:FuzzyFinderOptions.Bookmark.searching_range option to 0.
-"
-"   Adding Bookmark:
-"     You can add a cursor line to bookmarks by the following commands:
-"
-"       :FuzzyFinderAddBookmark
-"
-"     Execute that command and you will be prompted to enter a bookmark name.
-"
-"   About Information File:
-"     Fuzzyfinder writes information of the MRU, bookmark, etc to the file by
-"     default (~/.vimfuzzyfinder).
-
-"     :FuzzyFinderEditInfo command is helpful in editing your information
-"     file. This command reads the information file in new unnamed buffer.
-"     Write the buffer and the information file will be updated.
-"
-"   About Cache:
-"     Once a cache was created, It is not automatically updated to speed up
-"     the response time by default. To update it, use :FuzzyFinderRemoveCache
-"     command.
-"
-"   About Migemo:
-"     Migemo is a search method for Japanese language.
-"
-"-----------------------------------------------------------------------------
-" Options:
-"   You can set options via g:FuzzyFinderOptions which is a dictionary. See
-"   the folded section named "GLOBAL OPTIONS:" for details. To easily set
-"   options for customization, put necessary entries from GLOBAL OPTIONS into
-"   your vimrc file and edit those values.
-"
-"-----------------------------------------------------------------------------
-" Setting Example:
-"   let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'Bookmark':{}, 'Tag':{}, 'TaggedFile':{}}
-"   let g:FuzzyFinderOptions.Base.ignore_case = 1
-"   let g:FuzzyFinderOptions.Base.abbrev_map  = {
-"         \   '\C^VR' : [
-"         \     '$VIMRUNTIME/**',
-"         \     '~/.vim/**',
-"         \     '$VIM/.vim/**',
-"         \     '$VIM/vimfiles/**',
-"         \   ],
-"         \ }
-"   let g:FuzzyFinderOptions.MruFile.max_item = 200
-"   let g:FuzzyFinderOptions.MruCmd.max_item = 200
-"   nnoremap <silent> <C-n>      :FuzzyFinderBuffer<CR>
-"   nnoremap <silent> <C-m>      :FuzzyFinderFile <C-r>=expand('%:~:.')[:-1-len(expand('%:~:.:t'))]<CR><CR>
-"   nnoremap <silent> <C-j>      :FuzzyFinderMruFile<CR>
-"   nnoremap <silent> <C-k>      :FuzzyFinderMruCmd<CR>
-"   nnoremap <silent> <C-p>      :FuzzyFinderDir <C-r>=expand('%:p:~')[:-1-len(expand('%:p:~:t'))]<CR><CR>
-"   nnoremap <silent> <C-f><C-d> :FuzzyFinderDir<CR>
-"   nnoremap <silent> <C-b>      :FuzzyFinderBookmark<CR>
-"   nnoremap <silent> <C-f><C-t> :FuzzyFinderTag!<CR>
-"   nnoremap <silent> <C-f><C-g> :FuzzyFinderTaggedFile<CR>
-"   noremap  <silent> g]         :FuzzyFinderTag! <C-r>=expand('<cword>')<CR><CR>
-"   nnoremap <silent> <C-f>b     :FuzzyFinderAddBookmark<CR>
-"   nnoremap <silent> <C-f><C-e> :FuzzyFinderEditInfo<CR>
-"
-"-----------------------------------------------------------------------------
-" Special Thanks:
-"   Vincent Wang
-"   Ingo Karkat
-"   Nikolay Golubev
-"   Brian Doyle
-"   id:secondlife
-"   Matt Tolton
-"
-"-----------------------------------------------------------------------------
-" ChangeLog:
-"   2.19:
-"     - Changed MRU-File mode that always formats completion items to be
-"       relative to the home directory.
-"     - Fixed a bug that a file was opened in an unintended window with Tag
-"       List plugin. Thanks Alexey.
-"     - Fixed a bug that garbage characters were entered when switched current
-"       mode. Thanks id:lugecy.
-"
-"   2.18:
-"     - Improved rules for the sorting of completion items.
-"     - Changed not to learn a completion if an entered pattern is empty.
-"     - Fixed a bug that Buffer mode did not work. Thanks ryo7000.
-"
-"   2.17:
-"     - Introduced a learning system for the sorting of completion items.
-"     - Added g:FuzzyFinderOptions.Base.learning_limit option.
-"     - Changed the specification of the information file. Please remove your
-"       information file for Fuzzyfinder.
-"
-"   2.16:
-"     - Improved response time by caching in MRU-File mode.
-"     - Fixed a bug in Bookmark mode that Fuzzyfinder did not jump to the
-"       Bookmarked line number when Bookmarked pattern was not found.
-"
-"   2.15:
-"     - Added Bookmark mode.
-"     - Removed Favorite-file mode. Use Bookmark mode instead.
-"     - Fixed not to record a entry of input() in MRU-Command mode.
-"
-"   2.14:
-"     - Changed to show buffer status in Buffer mode.
-"     - Fixed a bug that an error occurs when nonexistent buffer-name was
-"       entered in Buffer mode. Thanks Maxim Kim.
-"     - Added 'enumerating_limit' option. Thanks id:secondlife.
-"     - Removed 'matching_limit' option. Use 'enumerating_limit' instead.
-"
-"   2.13:
-"     - Fixed a bug that a directory disappeared when a file in that directroy
-"       was being opened in File/Mru-File mode.
-"
-"   2.12:
-"     - Changed to be able to show completion items in the order of recently
-"       used in Buffer mode.
-"     - Added g:FuzzyFinderOptions.Buffer.mru_order option.
-"
-"   2.11:
-"     - Changed that a dot sequence of entered pattern is expanded to parent
-"       directroies in File/Dir mode.
-"       E.g.: "foo/...bar" -> "foo/../../bar"
-"     - Fixed a bug that a prompt string was excessively inserted.
-"
-"   2.10:
-"     - Changed not to show a current buffer in a completion menu.
-"     - Fixed a bug that a filename to open was not been escaped.
-"     - Added 'prompt' option.
-"     - Added 'prompt_highlight' option.
-"     - Removed g:FuzzyFinderOptions.MruFile.no_special_buffer option.
-"
-"   2.9:
-"     - Enhanced <BS> behavior in Fuzzyfinder and added 'smart_bs' option.
-"     - Fixed a bug that entered pattern was not been escaped.
-"     - Fixed not to insert "zv" with "c/pattern<CR>" command in Normal mode.
-"     - Avoid the slow down problem caused by filereadable() check for the MRU
-"       information in BufEnter/BufWritePost.
-"
-"   2.8.1:
-"     - Fixed a bug caused by the non-escaped buffer name "[Fuzzyfinder]".
-"     - Fixed a command to open in a new tab page in Buffer mode.
-"   2.8:
-"     - Added 'trim_length' option.
-"     - Added 'switch_order' option.
-"     - Fixed a bug that entered command did not become the newest in the
-"       history.
-"     - Fixed a bug that folds could not open with <CR> in a command-line when
-"       searching.
-"     - Removed 'excluded_indicator' option. Now a completion list in Buffer
-"       mode is the same as a result of :buffers.
-"
-"   2.7:
-"     - Changed to find an item whose index is matched with the number
-"       suffixed with entered pattern.
-"     - Fixed the cache bug after changing current directroy in File mode.
-"
-"   2.6.2:
-"     - Fixed not to miss changes in options when updates the MRU information.
-"
-"   2.6.1:
-"     - Fixed a bug related to floating-point support.
-"     - Added support for GetLatestVimScripts.
-"
-"   2.6:
-"     - Revived MRU-command mode. The problem with a command-line abbreviation
-"       was solved.
-"     - Changed the specification of the information file.
-"     - Added :FuzzyFinderEditInfo command.
-
-"   2.5.1:
-"     - Fixed to be able to match "foo/./bar" by "foo/**/bar" in File mode.
-"     - Fixed to be able to open a space-containing file in File mode.
-"     - Fixed to honor the current working directory properly in File mode.
-"
-"   2.5:
-"     - Fixed the bug that a wrong initial text is entered after switching to a
-"       next mode.
-"     - Fixed the bug that it does not return to previous window after leaving
-"       Fuzzyfinder one.
-"
-"   2.4:
-"     - Fixed the bug that Fuzzyfinder fails to open a file caused by auto-cd
-"       plugin/script.
-"
-"   2.3:
-"     - Added a key mapping to open items in a new tab page and
-"       g:FuzzyFinderOptions.Base.key_open_tab opton.
-"     - Changed to show Fuzzyfinder window above last window even if
-"       'splitbelow' was set.
-"     - Changed to set nocursorline and nocursorcolumn in Fuzzyfinder.
-"     - Fixed not to push up a buffer number unlimitedly.
-"
-"   2.2:
-"     - Added new feature, which is the partial matching.
-"     - Fixed the bug that an error occurs when "'" was entered.
-"
-"   2.1:
-"     - Restructured the option system AGAIN. Sorry :p
-"     - Changed to inherit a typed text when switching a mode without leaving
-"       Insert mode.
-"     - Changed commands which launch explorers to be able to take a argument
-"       for initial text.
-"     - Changed to complete file names by relative path and not full path in
-"       the buffer/mru-file/tagged-file mode.
-"     - Changed to highlight a typed text when the completion item was not
-"       found or the completion process was aborted.
-"     - Changed to create caches for each tag file and not working directory
-"       in the tag/tagged-file mode.
-"     - Fixed the bug that the buffer mode couldn't open a unnamed buffer.
-"     - Added 'matching_limit' option.
-"     - Removed 'max_match' option. Use 'matching_limit' option instead.
-"     - Removed 'initial_text' option. Use command argument instead.
-"     - Removed the MRU-command mode.
-"
-"   2.0:
-"     - Added the tag mode.
-"     - Added the tagged-file mode.
-"     - Added :FuzzyFinderRemoveCache command.
-"     - Restructured the option system. many options are changed names or
-"       default values of some options.
-"     - Changed to hold and reuse caches of completion lists by default.
-"     - Changed to set filetype 'fuzzyfinder'.
-"     - Disabled the MRU-command mode by default because there are problems.
-"     - Removed FuzzyFinderAddMode command.
-"
-"   1.5:
-"     - Added the directory mode.
-"     - Fixed the bug that it caused an error when switch a mode in Insert
-"       mode.
-"     - Changed g:FuzzyFinder_KeySwitchMode type to a list.
-"
-"   1.4:
-"     - Changed the specification of the information file.
-"     - Added the MRU-commands mode.
-"     - Renamed :FuzzyFinderAddFavorite command to :FuzzyFinderAddFavFile.
-"     - Renamed g:FuzzyFinder_MruModeVars option to
-"       g:FuzzyFinder_MruFileModeVars.
-"     - Renamed g:FuzzyFinder_FavoriteModeVars option to
-"       g:FuzzyFinder_FavFileModeVars.
-"     - Changed to show registered time of each item in MRU/favorite mode.
-"     - Added 'timeFormat' option for MRU/favorite modes.
-"
-"   1.3:
-"     - Fixed a handling of multi-byte characters.
-"
-"   1.2:
-"     - Added support for Migemo. (Migemo is Japanese search method.)
-"
-"   1.1:
-"     - Added the favorite mode.
-"     - Added new features, which are abbreviations and multiple search.
-"     - Added 'abbrevMap' option for each mode.
-"     - Added g:FuzzyFinder_MruModeVars['ignoreSpecialBuffers'] option.
-"     - Fixed the bug that it did not work correctly when a user have mapped
-"       <C-p> or <Down>.
-"
-"   1.0:
-"     - Added the MRU mode.
-"     - Added commands to add and use original mode.
-"     - Improved the sorting algorithm for completion items.
-"     - Added 'initialInput' option to automatically insert a text at the
-"       beginning of a mode.
-"     - Changed that 'excludedPath' option works for the entire path.
-"     - Renamed some options. 
-"     - Changed default values of some options. 
-"     - Packed the mode-specific options to dictionaries.
-"     - Removed some options.
-"
-"   0.6:
-"     - Fixed some bugs.
-
-"   0.5:
-"     - Improved response by aborting processing too many items.
-"     - Changed to be able to open a buffer/file not only in previous window
-"       but also in new window.
-"     - Fixed a bug that recursive searching with '**' does not work.
-"     - Added g:FuzzyFinder_CompletionItemLimit option.
-"     - Added g:FuzzyFinder_KeyOpen option.
-"
-"   0.4:
-"     - Improved response of the input.
-"     - Improved the sorting algorithm for completion items. It is based on
-"       the matching level. 1st is perfect matching, 2nd is prefix matching,
-"       and 3rd is fuzzy matching.
-"     - Added g:FuzzyFinder_ExcludePattern option.
-"     - Removed g:FuzzyFinder_WildIgnore option.
-"     - Removed g:FuzzyFinder_EchoPattern option.
-"     - Removed g:FuzzyFinder_PathSeparator option.
-"     - Changed the default value of g:FuzzyFinder_MinLengthFile from 1 to 0.
-"
-"   0.3:
-"     - Added g:FuzzyFinder_IgnoreCase option.
-"     - Added g:FuzzyFinder_KeyToggleIgnoreCase option.
-"     - Added g:FuzzyFinder_EchoPattern option.
-"     - Changed the open command in a buffer mode from ":edit" to ":buffer" to
-"       avoid being reset cursor position.
-"     - Changed the default value of g:FuzzyFinder_KeyToggleMode from
-"       <C-Space> to <F12> because <C-Space> does not work on some CUI
-"       environments.
-"     - Changed to avoid being loaded by Vim before 7.0.
-"     - Fixed a bug with making a fuzzy pattern which has '\'.
-"
-"   0.2:
-"     - A bug it does not work on Linux is fixed.
-"
-"   0.1:
-"     - First release.
-"
-" }}}1
 "=============================================================================
 " INCLUDE GUARD: {{{1
 if exists('loaded_fuzzyfinder') || v:version < 701
@@ -561,12 +98,12 @@ endfunction
 
 " FUNCTIONS: STRING ----------------------------------------------------- {{{1
 
-" trims a:str and add a:mark if a length of a:str is more than a:len
-function! s:TrimLast(str, len)
+" truncates a:str and add a:mark if a length of a:str is more than a:len
+function! s:TruncateHead(str, len)
   if a:len <= 0 || len(a:str) <= a:len
     return a:str
   endif
-  return a:str[:(a:len - len(s:ABBR_TRIM_MARK) - 1)] . s:ABBR_TRIM_MARK
+  return s:ABBR_TRUNCATION_MARK . a:str[-a:len + len(s:ABBR_TRUNCATION_MARK):]
 endfunction
 
 " takes suffix numer. if no digits, returns -1
@@ -783,12 +320,12 @@ function! s:EnumExpandedDirsEntries(dir, excluded)
   return entries
 endfunction
 
-function! s:GetBufIndicator(nr)
-  if !getbufvar(a:nr, '&modifiable')
+function! s:GetBufIndicator(buf_nr)
+  if !getbufvar(a:buf_nr, '&modifiable')
     return '[-]'
-  elseif getbufvar(a:nr, '&modified')
+  elseif getbufvar(a:buf_nr, '&modified')
     return '[+]'
-  elseif getbufvar(a:nr, '&readonly')
+  elseif getbufvar(a:buf_nr, '&readonly')
     return '[R]'
   else
     return '   '
@@ -820,8 +357,9 @@ function! s:SetRanks(item, eval_word, eval_base, stats)
   return a:item
 endfunction
 
-function! s:SetFormattedAbbr(item, key, trim_len)
-  let a:item.abbr = s:TrimLast(printf('%3d: %s', a:item.index, a:item[a:key]), a:trim_len)
+function! s:SetFormattedAbbr(item, key, truncation_len)
+  " -5 is a length of '%3d: '
+  let a:item.abbr = printf('%3d: %s', a:item.index, s:TruncateHead(a:item[a:key], a:truncation_len - 5))
   return a:item
 endfunction
 
@@ -848,8 +386,8 @@ endfunction
 
 " opens a:path and jumps to the line matching to a:pattern from a:lnum within
 " a:range. if not found, jumps to a:lnum.
-function! s:JumpToBookmark(path, mode, pattern, lnum, range)
-  call s:OpenFile(a:path, a:mode)
+function! s:JumpToBookmark(path, mode, pattern, lnum, range, reuse)
+  call s:OpenFile(a:path, a:mode, a:reuse)
   let ln = a:lnum
   for i in range(0, a:range)
     if a:lnum + i <= line('$') && getline(a:lnum + i) =~ a:pattern
@@ -864,29 +402,89 @@ function! s:JumpToBookmark(path, mode, pattern, lnum, range)
   normal! zvzz
 endfunction
 
-function! s:OpenBuffer(nr, mode)
-  execute printf([
-        \   ':%sbuffer',
-        \   ':%ssbuffer',
-        \   ':vertical :%ssbuffer',
-        \   ':tab :%ssbuffer',
-        \ ][a:mode], a:nr)
+" returns 0 if the buffer is not found.
+function! s:MoveToWindowOfBufferInCurrentTabPage(buf_nr)
+  if count(tabpagebuflist(), a:buf_nr) == 0
+    return 0
+  endif
+  execute bufwinnr(a:buf_nr) . 'wincmd w'
+  return 1
 endfunction
 
-function! s:OpenFile(path, mode)
-  let nr = bufnr('^' . a:path . '$')
-  if nr > -1
-    call s:OpenBuffer(nr, a:mode)
+" returns 0 if the buffer is not found.
+function! s:MoveToOtherTabPageOpeningBuffer(buf_nr)
+  for tab_nr in range(1, tabpagenr('$'))
+    if tab_nr != tabpagenr() && count(tabpagebuflist(tab_nr), a:buf_nr) > 0
+      execute 'tabnext ' . tab_nr
+      return 1
+    endif
+  endfor
+  return 0
+endfunction
+
+" returns 0 if the buffer is not found.
+function! s:MoveToWindowOfBufferInOtherTabPage(buf_nr)
+  if !s:MoveToOtherTabPageOpeningBuffer(a:buf_nr)
+    return 0
+  endif
+  return s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)
+endfunction
+
+function! s:OpenBuffer(buf_nr, mode, reuse)
+  if a:reuse && ((a:mode == s:OPEN_MODE_SPLIT  && s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
+        \        (a:mode == s:OPEN_MODE_VSPLIT && s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
+        \        (a:mode == s:OPEN_MODE_TAB    && s:MoveToWindowOfBufferInOtherTabPage  (a:buf_nr)))
+    return
+  endif
+  execute printf({
+        \   s:OPEN_MODE_CURRENT : ':%sbuffer'           ,
+        \   s:OPEN_MODE_SPLIT   : ':%ssbuffer'          ,
+        \   s:OPEN_MODE_VSPLIT  : ':vertical :%ssbuffer',
+        \   s:OPEN_MODE_TAB     : ':tab :%ssbuffer'     ,
+        \ }[a:mode], a:buf_nr)
+endfunction
+
+function! s:OpenFile(path, mode, reuse)
+  let buf_nr = bufnr('^' . a:path . '$')
+  if buf_nr > -1
+    call s:OpenBuffer(buf_nr, a:mode, a:reuse)
   else
-    execute [
-          \   ':edit ',
-          \   ':split ',
-          \   ':vsplit ',
-          \   ':tabedit ',
-          \ ][a:mode] . s:EscapeFilename(a:path)
+    execute {
+          \   s:OPEN_MODE_CURRENT : ':edit '   ,
+          \   s:OPEN_MODE_SPLIT   : ':split '  ,
+          \   s:OPEN_MODE_VSPLIT  : ':vsplit ' ,
+          \   s:OPEN_MODE_TAB     : ':tabedit ',
+          \ }[a:mode] . s:EscapeFilename(a:path)
   endif
 endfunction
 
+function s:OpenTag(path, mode)
+  execute {
+        \   s:OPEN_MODE_CURRENT : ':tjump '           ,
+        \   s:OPEN_MODE_SPLIT   : ':stjump '          ,
+        \   s:OPEN_MODE_VSPLIT  : ':vertical :stjump ',
+        \   s:OPEN_MODE_TAB     : ':tab :stjump '     ,
+        \ }[a:mode] . a:expr
+endfunction
+
+function! s:SelectedText() " by id:ka-nacht
+  let [visual_p, pos] = [mode() =~# "[vV\<C-v>]", getpos('.')]
+  let [r_, r_t] = [@@, getregtype('"')]
+  let [r0, r0t] = [@0, getregtype('0')]
+  if visual_p
+    execute "normal! \<Esc>"
+  endif
+  silent normal! gvy
+  let [_, _t] = [@@, getregtype('"')]
+  call setreg('"', r_, r_t)
+  call setreg('0', r0, r0t)
+  if visual_p
+    normal! gv
+  else
+    call setpos('.', pos)
+  endif
+  return _
+endfunction
 " }}}1
 "=============================================================================
 " OBJECT: g:FuzzyFinderMode.Base ---------------------------------------- {{{1
@@ -915,15 +513,15 @@ function! g:FuzzyFinderMode.Base.launch(initial_text, partial_matching)
   augroup END
   " local mapping
   for [lhs, rhs] in [
-        \   [ self.key_open       , self.to_str('on_cr(0, 0)'            ) ],
-        \   [ self.key_open_split , self.to_str('on_cr(1, 0)'            ) ],
-        \   [ self.key_open_vsplit, self.to_str('on_cr(2, 0)'            ) ],
-        \   [ self.key_open_tab   , self.to_str('on_cr(3, 0)'            ) ],
-        \   [ '<BS>'              , self.to_str('on_bs()'                ) ],
-        \   [ '<C-h>'             , self.to_str('on_bs()'                ) ],
-        \   [ self.key_next_mode  , self.to_str('on_switch_mode(+1)'     ) ],
-        \   [ self.key_prev_mode  , self.to_str('on_switch_mode(-1)'     ) ],
-        \   [ self.key_ignore_case, self.to_str('on_switch_ignore_case()') ],
+        \   [ self.key_open       , self.to_str('on_cr(' . s:OPEN_MODE_CURRENT . ', 0)') ],
+        \   [ self.key_open_split , self.to_str('on_cr(' . s:OPEN_MODE_SPLIT   . ', 0)') ],
+        \   [ self.key_open_vsplit, self.to_str('on_cr(' . s:OPEN_MODE_VSPLIT  . ', 0)') ],
+        \   [ self.key_open_tab   , self.to_str('on_cr(' . s:OPEN_MODE_TAB     . ', 0)') ],
+        \   [ '<BS>'              , self.to_str('on_bs()'                              ) ],
+        \   [ '<C-h>'             , self.to_str('on_bs()'                              ) ],
+        \   [ self.key_next_mode  , self.to_str('on_switch_mode(+1)'                   ) ],
+        \   [ self.key_prev_mode  , self.to_str('on_switch_mode(-1)'                   ) ],
+        \   [ self.key_ignore_case, self.to_str('on_switch_ignore_case()'              ) ],
         \ ]
     " hacks to be able to use feedkeys().
     execute printf('inoremap <buffer> <silent> %s <C-r>=%s ? "" : ""<CR>', lhs, rhs)
@@ -946,7 +544,7 @@ function! g:FuzzyFinderMode.Base.on_cursor_moved_i()
     " if the cursor is placed on the end of the line and has been actually moved.
     let self.last_col = col('.')
     let self.last_base = s:RemovePrompt(getline('.'), self.prompt)
-    call feedkeys("\<C-x>\<C-u>", 'n')
+    call feedkeys("\<C-x>\<C-o>", 'n')
   endif
 endfunction
 
@@ -1013,7 +611,7 @@ function! g:FuzzyFinderMode.Base.on_mode_leave_post()
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_open(expr, mode)
-  call s:OpenFile(a:expr, a:mode)
+  call s:OpenFile(a:expr, a:mode, self.reuse_window)
 endfunction
 
 function! g:FuzzyFinderMode.Base.on_switch_mode(next_prev)
@@ -1167,7 +765,7 @@ function! g:FuzzyFinderMode.Buffer.on_open(expr, mode)
   " filter the selected item to get the buffer number for handling unnamed buffer
   call filter(self.items, 'v:val.word ==# a:expr')
   if !empty(self.items)
-    call s:OpenBuffer(self.items[0].buf_nr, a:mode)
+    call s:OpenBuffer(self.items[0].buf_nr, a:mode, self.reuse_window)
   endif
 endfunction
 
@@ -1177,7 +775,7 @@ function! g:FuzzyFinderMode.Buffer.on_mode_enter_post()
   if self.mru_order
     call s:MapToSetSerialIndex(sort(self.items, 's:CompareTimeDescending'), 1)
   endif
-  call map(self.items, 's:SetFormattedAbbr(v:val, "abbr", self.trim_length)')
+  call map(self.items, 's:SetFormattedAbbr(v:val, "abbr", self.max_menu_width)')
 endfunction
 
 function! g:FuzzyFinderMode.Buffer.on_buf_enter()
@@ -1233,7 +831,7 @@ function! g:FuzzyFinderMode.File.cached_glob(dir, file, excluded, index, limit)
   echo 'Filtering file list...'
   let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
   call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
-  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)') 
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)') 
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.Dir ----------------------------------------- {{{1
@@ -1264,7 +862,7 @@ function! g:FuzzyFinderMode.Dir.cached_glob_dir(dir, file, excluded, index, limi
   echo 'Filtering file list...'
   let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
   call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
-  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)') 
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)') 
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.MruFile ------------------------------------- {{{1
@@ -1283,7 +881,7 @@ function! g:FuzzyFinderMode.MruFile.on_mode_enter_post()
   let self.items = map(self.items, 'self.format_item_using_cache(v:val)')
   let self.items = filter(self.items, '!empty(v:val) && bufnr("^" . v:val.word . "$") != self.prev_bufnr')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
-  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)')
 endfunction
 
 function! g:FuzzyFinderMode.MruFile.on_buf_enter()
@@ -1351,7 +949,7 @@ function! g:FuzzyFinderMode.MruCmd.on_mode_enter_post()
   let self.items = copy(self.data)
   let self.items = map(self.items, 's:SetFormattedTimeToMenu(v:val, self.time_format)')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
-  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)')
 endfunction
 
 function! g:FuzzyFinderMode.MruCmd.on_command_pre(cmd)
@@ -1382,14 +980,15 @@ function! g:FuzzyFinderMode.Bookmark.on_open(expr, mode)
   if empty(self.items)
     return ''
   endif
-  call s:JumpToBookmark(self.items[0].path, a:mode, self.items[0].pattern, self.items[0].lnum, self.searching_range)
+  call s:JumpToBookmark(self.items[0].path, a:mode, self.items[0].pattern, self.items[0].lnum, self.searching_range,
+        \               self.reuse_window)
 endfunction
 
 function! g:FuzzyFinderMode.Bookmark.on_mode_enter_post()
   let self.items = copy(self.data)
   let self.items = map(self.items, 's:SetFormattedTimeToMenu(v:val, self.time_format)')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
-  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
+  let self.items = map(self.items, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)')
 endfunction
 
 function! g:FuzzyFinderMode.Bookmark.bookmark_here(word)
@@ -1426,12 +1025,7 @@ function! g:FuzzyFinderMode.Tag.on_complete(base)
 endfunction
 
 function! g:FuzzyFinderMode.Tag.on_open(expr, mode)
-  execute [
-        \   ':tjump ',
-        \   ':stjump ',
-        \   ':vertical :stjump ',
-        \   ':tab :stjump ',
-        \ ][a:mode] . a:expr
+  call s:OpenTag(a:expr, a:mode)
 endfunction
 
 function! g:FuzzyFinderMode.Tag.on_mode_enter_pre()
@@ -1453,7 +1047,7 @@ function! g:FuzzyFinderMode.Tag.find_tag(pattern, index, limit)
   endif
   echo 'Filtering tag list...'
   let result = s:FilterMatching(self.cache[key].items, 'word', a:pattern, a:index, a:limit)
-  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)')
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.TaggedFile ---------------------------------- {{{1
@@ -1488,7 +1082,7 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, index, limit)
   echo 'Filtering tagged-file list...'
   call map(self.cache[key].items, 's:ModifyWordAsFilename(v:val, '':.'')')
   let result = s:FilterMatching(self.cache[key].items, 'word', a:pattern, a:index, a:limit)
-  return map(result, 's:SetFormattedAbbr(v:val, "word", self.trim_length)')
+  return map(result, 's:SetFormattedAbbr(v:val, "word", self.max_menu_width)')
 endfunction
 
 " OBJECT: s:OptionManager ----------------------------------------------- {{{1
@@ -1542,8 +1136,8 @@ function! s:Open1LineBuffer(buf_nr, buf_name)
 endfunction
 
 function! s:SetLocalOptionsForFuzzyfinder(cwd, complete_func)
-  " countermeasure for auto-cd script
-  execute ':lcd ' . a:cwd
+  " countermeasure against auto-cd script
+  execute ':lcd ' . escape(a:cwd, ' ')
   setlocal filetype=fuzzyfinder
   setlocal bufhidden=delete
   setlocal buftype=nofile
@@ -1552,7 +1146,7 @@ function! s:SetLocalOptionsForFuzzyfinder(cwd, complete_func)
   setlocal modifiable
   setlocal nocursorline   " for highlighting
   setlocal nocursorcolumn " for highlighting
-  let &l:completefunc = a:complete_func
+  let &l:omnifunc = a:complete_func
 endfunction
 
 " OBJECT: s:InfoFileManager --------------------------------------------- {{{1
@@ -1562,7 +1156,7 @@ function! s:InfoFileManager.load()
   try
     let lines = readfile(expand(self.get_info_file()))
     " compatibility check
-    if !count(lines, self.get_info_version_line())
+    if count(lines, self.get_info_version_line()) == 0
       call self.warn_old_info()
       let g:FuzzyFinderOptions.Base.info_file = ''
       throw 1
@@ -1637,190 +1231,93 @@ endfunction
 "=============================================================================
 " GLOBAL OPTIONS: {{{1
 " stores user-defined g:FuzzyFinderOptions ------------------------------ {{{2
-let user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {})
+let s:user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {})
 " }}}2
 
 " Initializes g:FuzzyFinderOptions.
 let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'Bookmark':{}, 'Tag':{}, 'TaggedFile':{}}
 "-----------------------------------------------------------------------------
-" [All Mode] This is mapped to select completion item or finish input and
-" open a buffer/file in previous window.
 let g:FuzzyFinderOptions.Base.key_open = '<CR>'
-" [All Mode] This is mapped to select completion item or finish input and
-" open a buffer/file in split new window
 let g:FuzzyFinderOptions.Base.key_open_split = '<C-j>'
-" [All Mode] This is mapped to select completion item or finish input and
-" open a buffer/file in vertical-split new window.
 let g:FuzzyFinderOptions.Base.key_open_vsplit = '<C-k>'
-" [All Mode] This is mapped to select completion item or finish input and
-" open a buffer/file in a new tab page.
-let g:FuzzyFinderOptions.Base.key_open_tab = '<C-]>'
-" [All Mode] This is mapped to switch to the next mode.
-let g:FuzzyFinderOptions.Base.key_next_mode = '<C-l>'
-" [All Mode] This is mapped to switch to the previous mode.
-let g:FuzzyFinderOptions.Base.key_prev_mode = '<C-o>'
-" [All Mode] This is mapped to temporarily switch whether or not to ignore
-" case.
-let g:FuzzyFinderOptions.Base.key_ignore_case = '<C-t>'
-" [All Mode] This is the file name to write information of the MRU, etc. If
-" "" was set, Fuzzyfinder does not write to the file.
+let g:FuzzyFinderOptions.Base.key_open_tab = '<C-l>'
+let g:FuzzyFinderOptions.Base.key_next_mode = '<C-t>'
+let g:FuzzyFinderOptions.Base.key_prev_mode = '<C-y>'
+let g:FuzzyFinderOptions.Base.key_ignore_case = '<C-g><C-g>'
 let g:FuzzyFinderOptions.Base.info_file = '~/.vimfuzzyfinder'
-" [All Mode] Fuzzyfinder does not start a completion if a length of entered
-" text is less than this.
 let g:FuzzyFinderOptions.Base.min_length = 0
-" [All Mode] This is a dictionary. Each value must be a list. All matchs of a
-" key in entered text is expanded with the value.
 let g:FuzzyFinderOptions.Base.abbrev_map = {}
-" [All Mode] Fuzzyfinder ignores case in search patterns if non-zero is set.
 let g:FuzzyFinderOptions.Base.ignore_case = 1
-" [All Mode] This is a string to format time string. See :help strftime() for
-" details.
 let g:FuzzyFinderOptions.Base.time_format = '(%x %H:%M:%S)'
-" [All Mode] This is the ceiling for the number of completion statistics to be
-" stored.
 let g:FuzzyFinderOptions.Base.learning_limit = 100
-" [All Mode] To speed up the response time, Fuzzyfinder ends enumerating
-" completion items when found over this.
-let g:FuzzyFinderOptions.Base.enumerating_limit = 50
-" [All Mode] If a length of completion item is more than this, it is trimmed
-" when shown in completion menu.
-let g:FuzzyFinderOptions.Base.trim_length = 80
-" [All Mode] Fuzzyfinder does not remove caches of completion lists at the end
-" of explorer to reuse at the next time if non-zero was set.
+let g:FuzzyFinderOptions.Base.enumerating_limit = 100
+let g:FuzzyFinderOptions.Base.max_menu_width = 80
 let g:FuzzyFinderOptions.Base.lasting_cache = 1
-" [All Mode] Fuzzyfinder uses Migemo if non-zero is set.
 let g:FuzzyFinderOptions.Base.migemo_support = 0
 "-----------------------------------------------------------------------------
-" [Buffer Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Buffer.mode_available = 1
-" [Buffer Mode] The prompt string.
 let g:FuzzyFinderOptions.Buffer.prompt = '>Buffer>'
-" [Buffer Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.Buffer.prompt_highlight = 'Question'
-" [Buffer Mode] Pressing <BS> after a path separator deletes one directory
-" name if non-zero is set.
 let g:FuzzyFinderOptions.Buffer.smart_bs = 1
-" [Buffer Mode] This is used to sort modes for switching to the next/previous
-" mode.
 let g:FuzzyFinderOptions.Buffer.switch_order = 10
-" [Buffer Mode] The completion items is sorted in the order of recently used
-" if non-zero is set.
+let g:FuzzyFinderOptions.Buffer.reuse_window = 1
 let g:FuzzyFinderOptions.Buffer.mru_order = 1
 "-----------------------------------------------------------------------------
-" [File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.File.mode_available = 1
-" [File Mode] The prompt string.
 let g:FuzzyFinderOptions.File.prompt = '>File>'
-" [File Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.File.prompt_highlight = 'Question'
-" [File Mode] Pressing <BS> after a path separator deletes one directory name
-" if non-zero is set.
 let g:FuzzyFinderOptions.File.smart_bs = 1
-" [File Mode] This is used to sort modes for switching to the next/previous
-" mode.
 let g:FuzzyFinderOptions.File.switch_order = 20
-" [File Mode] The items matching this are excluded from the completion list.
+let g:FuzzyFinderOptions.File.reuse_window = 1
 let g:FuzzyFinderOptions.File.excluded_path = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$|((^|[/\\])\.[/\\]$)'
 "-----------------------------------------------------------------------------
-" [Directory Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Dir.mode_available = 1
-" [Directory Mode] The prompt string.
 let g:FuzzyFinderOptions.Dir.prompt = '>Dir>'
-" [Directory Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.Dir.prompt_highlight = 'Question'
-" [Directory Mode] Pressing <BS> after a path separator deletes one directory
-" name if non-zero is set.
 let g:FuzzyFinderOptions.Dir.smart_bs = 1
-" [Directory Mode] This is used to sort modes for switching to the
-" next/previous mode.
 let g:FuzzyFinderOptions.Dir.switch_order = 30
-" [Directory Mode] The items matching this are excluded from the completion
-" list.
 let g:FuzzyFinderOptions.Dir.excluded_path = '\v(^|[/\\])\.{1,2}[/\\]$'
 "-----------------------------------------------------------------------------
-" [Mru-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruFile.mode_available = 1
-" [Mru-File Mode] The prompt string.
 let g:FuzzyFinderOptions.MruFile.prompt = '>MruFile>'
-" [Mru-File Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.MruFile.prompt_highlight = 'Question'
-" [Mru-File Mode] Pressing <BS> after a path separator deletes one directory
-" name if non-zero is set.
 let g:FuzzyFinderOptions.MruFile.smart_bs = 1
-" [Mru-File Mode] This is used to sort modes for switching to the
-" next/previous mode.
 let g:FuzzyFinderOptions.MruFile.switch_order = 40
-" [Mru-File Mode] The items matching this are excluded from the completion
-" list.
+let g:FuzzyFinderOptions.MruFile.reuse_window = 1
 let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
-" [Mru-File Mode] This is the ceiling for the number of MRU items to be
-" stored.
 let g:FuzzyFinderOptions.MruFile.max_item = 200
 "-----------------------------------------------------------------------------
-" [Mru-Cmd Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.MruCmd.mode_available = 1
-" [Mru-Cmd Mode] The prompt string.
 let g:FuzzyFinderOptions.MruCmd.prompt = '>MruCmd>'
-" [Mru-Cmd Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.MruCmd.prompt_highlight = 'Question'
-" [Mru-Cmd Mode] Pressing <BS> after a path separator deletes one directory
-" name if non-zero is set.
 let g:FuzzyFinderOptions.MruCmd.smart_bs = 0
-" [Mru-Cmd Mode] This is used to sort modes for switching to the next/previous
-" mode.
 let g:FuzzyFinderOptions.MruCmd.switch_order = 50
-" [Mru-Cmd Mode] The items matching this are excluded from the completion
-" list.
 let g:FuzzyFinderOptions.MruCmd.excluded_command = '^$'
-" [Mru-Cmd Mode] This is the ceiling for the number of MRU items to be stored.
 let g:FuzzyFinderOptions.MruCmd.max_item = 200
 "-----------------------------------------------------------------------------
-" [Bookmark Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Bookmark.mode_available = 1
-" [Bookmark Mode] The prompt string.
 let g:FuzzyFinderOptions.Bookmark.prompt = '>Bookmark>'
-" [Bookmark Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.Bookmark.prompt_highlight = 'Question'
-" [Bookmark Mode] Pressing <BS> after a path separator deletes one directory
-" name if non-zero is set.
 let g:FuzzyFinderOptions.Bookmark.smart_bs = 0
-" [Bookmark Mode] This is used to sort modes for switching to the
-" next/previous mode.
 let g:FuzzyFinderOptions.Bookmark.switch_order = 60
-" [Bookmark Mode] Fuzzyfinder searches a matching line from bookmarked
-" position within this number of lines.
+let g:FuzzyFinderOptions.Bookmark.reuse_window = 1
 let g:FuzzyFinderOptions.Bookmark.searching_range = 100
 "-----------------------------------------------------------------------------
-" [Tag Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.Tag.mode_available = 1
-" [Tag Mode] The prompt string.
 let g:FuzzyFinderOptions.Tag.prompt = '>Tag>'
-" [Tag Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.Tag.prompt_highlight = 'Question'
-" [Tag Mode] Pressing <BS> after a path separator deletes one directory name
-" if non-zero is set.
 let g:FuzzyFinderOptions.Tag.smart_bs = 0
-" [Tag Mode] This is used to sort modes for switching to the next/previous
-" mode.
 let g:FuzzyFinderOptions.Tag.switch_order = 70
-" [Tag Mode] The items matching this are excluded from the completion list.
-let g:FuzzyFinderOptions.Tag.excluded_path = '\v\~$|\.bak$|\.swp$'
 "-----------------------------------------------------------------------------
-" [Tagged-File Mode] This disables all functions of this mode if zero was set.
 let g:FuzzyFinderOptions.TaggedFile.mode_available = 1
-" [Tagged-File Mode] The prompt string.
 let g:FuzzyFinderOptions.TaggedFile.prompt = '>TaggedFile>'
-" [Tagged-File Mode] The highlight group name for a prompt string.
 let g:FuzzyFinderOptions.TaggedFile.prompt_highlight = 'Question'
-" [Tagged-File Mode] Pressing <BS> after a path separator deletes one
-" directory name if non-zero is set.
 let g:FuzzyFinderOptions.TaggedFile.smart_bs = 0
-" [Tagged-File Mode] This is used to sort modes for switching to the
-" next/previous mode.
 let g:FuzzyFinderOptions.TaggedFile.switch_order = 80
+let g:FuzzyFinderOptions.TaggedFile.reuse_window = 1
 
 " overwrites default values of g:FuzzyFinderOptions with user-defined values - {{{2
-call map(user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
+call map(s:user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
 call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
 " }}}2
 
@@ -1830,28 +1327,38 @@ call map(copy(g:FuzzyFinderMode), 'v:val.extend_options()')
 
 let s:PATH_SEPARATOR = (has('win32') || has('win64') ? '\' : '/')
 let s:MATCHING_RATE_BASE = 1000000
-let s:ABBR_TRIM_MARK = '...'
+let s:ABBR_TRUNCATION_MARK = '...'
+let s:OPEN_MODE_CURRENT = 0
+let s:OPEN_MODE_SPLIT   = 1
+let s:OPEN_MODE_VSPLIT  = 2
+let s:OPEN_MODE_TAB     = 3
 
 augroup FuzzyfinderGlobal
   autocmd!
-  autocmd BufEnter     * for m in s:GetAvailableModes() | call m.extend_options() | call m.on_buf_enter() | endfor
-  autocmd BufWritePost * for m in s:GetAvailableModes() | call m.extend_options() | call m.on_buf_write_post() | endfor
+  autocmd BufEnter     * for s:m in s:GetAvailableModes() | call s:m.extend_options() | call s:m.on_buf_enter() | endfor
+  autocmd BufWritePost * for s:m in s:GetAvailableModes() | call s:m.extend_options() | call s:m.on_buf_write_post() | endfor
 augroup END
 
 " cnoremap has a problem, which doesn't expand cabbrev.
 cmap <silent> <expr> <CR> <SID>OnCmdCR()
 
-command! -bang -narg=? -complete=buffer FuzzyFinderBuffer      call g:FuzzyFinderMode.Buffer.launch    (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderFile        call g:FuzzyFinderMode.File.launch      (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=dir    FuzzyFinderDir         call g:FuzzyFinderMode.Dir.launch       (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderMruFile     call g:FuzzyFinderMode.MruFile.launch   (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderMruCmd      call g:FuzzyFinderMode.MruCmd.launch    (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderBookmark    call g:FuzzyFinderMode.Bookmark.launch  (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=tag    FuzzyFinderTag         call g:FuzzyFinderMode.Tag.launch       (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile  call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderEditInfo    call s:InfoFileManager.edit()
-command! -bang -narg=? -complete=file   FuzzyFinderAddBookmark call g:FuzzyFinderMode.Bookmark.bookmark_here(<q-args>)
-command! -bang -narg=0                  FuzzyFinderRemoveCache for m in s:GetAvailableModes() | call m.empty_cache_if_existed(1) | endfor
+command! -bang -narg=? -complete=buffer FuzzyFinderBuffer                    call g:FuzzyFinderMode.Buffer.launch    (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFile                      call g:FuzzyFinderMode.File.launch      (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFileWithFullCwd           call g:FuzzyFinderMode.File.launch      (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFileWithCurrentBufferDir  call g:FuzzyFinderMode.File.launch      (expand('%:~:.')[:-1-len(expand('%:~:.:t'))] . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDir                       call g:FuzzyFinderMode.Dir.launch       (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDirWithFullCwd            call g:FuzzyFinderMode.Dir.launch       (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDirWithCurrentBufferDir   call g:FuzzyFinderMode.Dir.launch       (expand('%:p:~')[:-1-len(expand('%:p:~:t'))] . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderMruFile                   call g:FuzzyFinderMode.MruFile.launch   (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderMruCmd                    call g:FuzzyFinderMode.MruCmd.launch    (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderBookmark                  call g:FuzzyFinderMode.Bookmark.launch  (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=tag    FuzzyFinderTag                       call g:FuzzyFinderMode.Tag.launch       (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=tag    FuzzyFinderTagWithCursorWord         call g:FuzzyFinderMode.Tag.launch       (expand('<cword>') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile                call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>))
+command! -bang -narg=?                  FuzzyFinderAddBookmark               call g:FuzzyFinderMode.Bookmark.bookmark_here(<q-args>)
+command! -bang -narg=0 -range           FuzzyFinderAddBookmarkAsSelectedText call g:FuzzyFinderMode.Bookmark.bookmark_here(s:SelectedText())
+command! -bang -narg=0                  FuzzyFinderEditInfo                  call s:InfoFileManager.edit()
+command! -bang -narg=0                  FuzzyFinderRenewCache                for s:m in s:GetAvailableModes() | call s:m.empty_cache_if_existed(1) | endfor
 
 " }}}1
 "=============================================================================
