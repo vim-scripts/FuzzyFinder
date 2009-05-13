@@ -9,33 +9,32 @@ Fuzzyfinder はバッファ/ファイル/コマンド/ブックマーク/タグ�
 ための手段を提供します。入力されたパターンをあいまいパターンまたは部分一致パタ
 ーンに変換しマッチングを行います。
 
-  入力パターン     あいまいパターン          部分一致パターン ~
-  abc              * a * b * c *             * abc *
-  a?c              * a ? c *                 * a ? c *
-  dir/file         dir/ * f * i * l * e *    dir/ * file *
-  d*r/file         d * r/ * f * i * l * e *  d * r/ * file *
-  ../**/s          ../ ** / * s *            ../ ** / * s *
-                   (** allows searching a directory tree.)
+        入力パターン     あいまいパターン          部分一致パターン ~
+        abc              * a * b * c *             * abc *
+        dir/file         dir/ * f * i * l * e *    dir/ * file *
+        d*r/file         d * r/ * f * i * l * e *  d * r/ * file *
+        ../**/s          ../ ** / * s *            ../ ** / * s *
+                         (** allows searching a directory tree.)
 
 次のような場面で有用です:
 
-  "./AhLongLongLongLongLongFile.txt"
-  "./AhLongLongLongLongLongName.txt"
-  "./OhLongLongLongLongLongFile.txt"
-  "./OhLongLongLongLongLongName.txt" <- 欲しいファイル :-O
+        "./AhLongLongLongLongLongFile.txt"
+        "./AhLongLongLongLongLongName.txt"
+        "./OhLongLongLongLongLongFile.txt"
+        "./OhLongLongLongLongLongName.txt" <- 欲しいファイル :-O
 
 "ON" と入力すれば "OhLongLongLongLongLongName.txt" が選択できます. :-D
 
 Fuzzyfinder にはいくつかのモードがあります:
 
-  Buffer モード
-  File モード
-  Directory モード (:cd コマンドの代わり)
-  MRU-File モード (最近使ったファイル)
-  MRU-Command モード (最近使ったコマンドライン)
-  Bookmark モード
-  Tag モード (|:tag|コマンドの代わり)
-  Tagged-File モード (tagsファイルに含まれるファイル)
+        Buffer モード
+        File モード
+        Directory モード (:cd コマンドの代わり)
+        MRU-File モード (最近使ったファイル)
+        MRU-Command モード (最近使ったコマンドライン)
+        Bookmark モード
+        Tag モード (|:tag|コマンドの代わり)
+        Tagged-File モード (tagsファイルに含まれるファイル)
 
 Fuzzyfinder はマルチバイト文字をサポートしています。
 
@@ -62,15 +61,15 @@ ZIPファイルをランタイムディレクトリに展開します。
 
 次のコマンドで Fuzzyfinder を起動します:
 
-   コマンド                  モード ~
-  |:FuzzyFinderBuffer|     - Buffer モード
-  |:FuzzyFinderFile|       - File モード
-  |:FuzzyFinderDir|        - Directory モード
-  |:FuzzyFinderMruFile|    - MRU-File モード
-  |:FuzzyFinderMruCmd|     - MRU-Command モード
-  |:FuzzyFinderBookmark|   - Bookmark モード
-  |:FuzzyFinderTag|        - Tag モード
-  |:FuzzyFinderTaggedFile| - Tagged-File モード
+         コマンド                  モード ~
+        |:FuzzyFinderBuffer|     - Buffer モード
+        |:FuzzyFinderFile|       - File モード
+        |:FuzzyFinderDir|        - Directory モード
+        |:FuzzyFinderMruFile|    - MRU-File モード
+        |:FuzzyFinderMruCmd|     - MRU-Command モード
+        |:FuzzyFinderBookmark|   - Bookmark モード
+        |:FuzzyFinderTag|        - Tag モード
+        |:FuzzyFinderTaggedFile| - Tagged-File モード
 
 これらのコマンドを押しやすいキーにマッピングすることを推奨します。これらのコマ
 ンドは初期テキストをコマンド引数として受け取ることができます。初期テキストは
@@ -108,7 +107,7 @@ Fuzzyfinder は幾つかのルールに従って補完アイテムをソート�
         <CR>  - 直前のウィンドウで開きます。
         <C-j> - 直前のウィンドウを分割して開きます。
         <C-k> - 直前のウィンドウを垂直分割して開きます。
-        <C-]> - 別のタブページで開きます。
+        <C-l> - 別のタブページで開きます。
 
 キャンセルして直前のウィンドウに戻るには、インサートモードを抜けてください。
 
@@ -189,6 +188,17 @@ Fuzzyfinder は補完統計、MRUデータ、ブックマークなどを
 一旦キャッシュが生成されると、レスポンスを向上させるため自動的には更新されませ
 ん。これを更新するには :FuzzyFinderRenewCache コマンドを実行してください。
 
+                                                    *fuzzyfinder-dot-sequence*
+ドット列で親ディレクトリへ移動 (File/Directory モード) ~
+
+ドット列を入力することで親ディレクトリを上がっていくことができます。パス区切り
+文字直後のドット列は "../" の列に展開されます。
+
+        ドット列        展開パターン ~
+        /..             /../
+        /...            /../../
+        /....           /../../../
+
                                                    *fuzzyfinder-bookmark-mode*
 Bookmark モードについて ~
 
@@ -221,6 +231,18 @@ Tagged-File モード ~
 
 補完アイテムは tags ファイルに含まれるファイルです。これらのファイルは作業環境
 に関連しているので、一種のプロジェクトモードです。
+
+                                               *fuzzyfinder-callbackfile-mode*
+Callback-File モードの利用 ~
+
+Callback-File モードはファイルを探すための API を提供します。コマンドインター
+フェースはありません。
+
+                                               *fuzzyfinder-callbackitem-mode*
+Callback-Item モードの利用 ~
+
+Callback-Item モードは与えられたリストからアイテムを選択するためのを API を提
+供します。コマンドインターフェースはありません。
 
                                                           *fuzzyfinder-migemo*
 Migemo とは ~
@@ -342,7 +364,7 @@ Migemo とは ~
                 て開くキーです。
 
                                    *g:FuzzyFinderOptions.Base.key_open_tab*  >
-        let g:FuzzyFinderOptions.Base.key_open_tab = '<C-]>'
+        let g:FuzzyFinderOptions.Base.key_open_tab = '<C-l>'
 <
                 補完を確定し、バッファ/ファイルを別タブページ開くキーです。
 
@@ -446,7 +468,7 @@ Buffer モード用 ~
         let g:FuzzyFinderOptions.Buffer.switch_order = 10
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                                  *g:FuzzyFinderOptions.Buffer.reuse_window*  >
         let g:FuzzyFinderOptions.Buffer.reuse_window = 1
@@ -487,7 +509,7 @@ File モード用 ~
         let g:FuzzyFinderOptions.File.switch_order = 20
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                                    *g:FuzzyFinderOptions.File.reuse_window*  >
         let g:FuzzyFinderOptions.File.reuse_window = 1
@@ -496,8 +518,7 @@ File モード用 ~
                 ます。
 
                                   *g:FuzzyFinderOptions.File.excluded_path*  >
-        let g:FuzzyFinderOptions.File.excluded_path =
-              \ '\v\~$|\.o$|\.exe$|\.bak$|\.swp$|((^|[/\\])\.[/\\]$)'
+        let g:FuzzyFinderOptions.File.excluded_path = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$'
 <
                 これにマッチするパスのアイテムは除外します。
 
@@ -529,11 +550,10 @@ Directory モード用 ~
         let g:FuzzyFinderOptions.Dir.switch_order = 30
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                                    *g:FuzzyFinderOptions.Dir.excluded_path*  >
-        let g:FuzzyFinderOptions.Dir.excluded_path =
-              \ '\v(^|[/\\])\.{1,2}[/\\]$'
+        let g:FuzzyFinderOptions.Dir.excluded_path = ''
 <
                 これにマッチするパスのアイテムは除外します。
 
@@ -565,7 +585,7 @@ Mru-File モード用 ~
         let g:FuzzyFinderOptions.MruFile.switch_order = 40
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                                 *g:FuzzyFinderOptions.MruFile.reuse_window*  >
         let g:FuzzyFinderOptions.MruFile.reuse_window = 1
@@ -574,8 +594,7 @@ Mru-File モード用 ~
                 ます。
 
                                *g:FuzzyFinderOptions.MruFile.excluded_path*  >
-        let g:FuzzyFinderOptions.MruFile.excluded_path =
-              \ '\v\~$|\.bak$|\.swp$'
+        let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
 <
                 これにマッチするパスのアイテムは除外します。
 
@@ -612,7 +631,7 @@ Mru-Cmd モード用 ~
         let g:FuzzyFinderOptions.MruCmd.switch_order = 50
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                              *g:FuzzyFinderOptions.MruCmd.excluded_command*  >
         let g:FuzzyFinderOptions.MruCmd.excluded_command = '^$'
@@ -652,7 +671,7 @@ Bookmark モード用 ~
         let g:FuzzyFinderOptions.Bookmark.switch_order = 60
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                                *g:FuzzyFinderOptions.Bookmark.reuse_window*  >
         let g:FuzzyFinderOptions.Bookmark.reuse_window = 1
@@ -694,7 +713,7 @@ Tag モード用 ~
         let g:FuzzyFinderOptions.Tag.switch_order = 70
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
        *fuzzyfinder-options-taggedfile-mode* *g:FuzzyFinderOptions.TaggedFile*
 Tagged-File モード用 ~
@@ -724,7 +743,7 @@ Tagged-File モード用 ~
         let g:FuzzyFinderOptions.TaggedFile.switch_order = 80
 <
                 次/前のモードに切り替えるためにモードをソートするときの比較値
-                です。
+                です。負数ならこのモードには切り替えません。
 
                              *g:FuzzyFinderOptions.TaggedFile.reuse_window*  >
         let g:FuzzyFinderOptions.TaggedFile.reuse_window = 1

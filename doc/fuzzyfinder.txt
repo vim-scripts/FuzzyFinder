@@ -9,33 +9,32 @@ Fuzzyfinder provides convenient ways to quickly reach the
 buffer/file/command/bookmark/tag you want. Fuzzyfinder finds matching items
 with a fuzzy/partial pattern to which it converted the entered pattern.
 
-  Entered pattern  Fuzzy pattern             Partial pattern ~
-  abc              * a * b * c *             * abc *
-  a?c              * a ? c *                 * a ? c *
-  dir/file         dir/ * f * i * l * e *    dir/ * file *
-  d*r/file         d * r/ * f * i * l * e *  d * r/ * file *
-  ../**/s          ../ ** / * s *            ../ ** / * s *
-                   (** allows searching a directory tree.)
+        Entered pattern  Fuzzy pattern             Partial pattern ~
+        abc              * a * b * c *             * abc *
+        dir/file         dir/ * f * i * l * e *    dir/ * file *
+        d*r/file         d * r/ * f * i * l * e *  d * r/ * file *
+        ../**/s          ../ ** / * s *            ../ ** / * s *
+                         (** allows searching a directory tree.)
 
 You will be happy when:
 
-  "./AhLongLongLongLongLongFile.txt"
-  "./AhLongLongLongLongLongName.txt"
-  "./OhLongLongLongLongLongFile.txt"
-  "./OhLongLongLongLongLongName.txt" <- you want :O
+        "./AhLongLongLongLongLongFile.txt"
+        "./AhLongLongLongLongLongName.txt"
+        "./OhLongLongLongLongLongFile.txt"
+        "./OhLongLongLongLongLongName.txt" <- you want :O
 
 Type "ON" and "OhLongLongLongLongLongName.txt" will be select. :D
 
 Fuzzyfinder has some modes:
 
-  Buffer mode
-  File mode
-  Directory mode (yet another :cd command)
-  MRU-File mode (most recently used files)
-  MRU-Command mode (most recently used command-lines)
-  Bookmark mode
-  Tag mode (yet another |:tag| command)
-  Tagged-File mode (files which are included in current tags)
+        Buffer mode
+        File mode
+        Directory mode (yet another :cd command)
+        MRU-File mode (most recently used files)
+        MRU-Command mode (most recently used command-lines)
+        Bookmark mode
+        Tag mode (yet another |:tag| command)
+        Tagged-File mode (files which are included in current tags)
 
 Fuzzyfinder supports multibyte characters.
 
@@ -62,20 +61,20 @@ Launching ~
 
 You can launch Fuzzyfinder by the following commands:
 
-   Command                   Mode ~
-  |:FuzzyFinderBuffer|     - Buffer mode
-  |:FuzzyFinderFile|       - File mode
-  |:FuzzyFinderDir|        - Directory mode
-  |:FuzzyFinderMruFile|    - MRU-File mode
-  |:FuzzyFinderMruCmd|     - MRU-Command mode
-  |:FuzzyFinderBookmark|   - Bookmark mode
-  |:FuzzyFinderTag|        - Tag mode
-  |:FuzzyFinderTaggedFile| - Tagged-File mode
+         Command                   Mode ~
+        |:FuzzyFinderBuffer|     - Buffer mode
+        |:FuzzyFinderFile|       - File mode
+        |:FuzzyFinderDir|        - Directory mode
+        |:FuzzyFinderMruFile|    - MRU-File mode
+        |:FuzzyFinderMruCmd|     - MRU-Command mode
+        |:FuzzyFinderBookmark|   - Bookmark mode
+        |:FuzzyFinderTag|        - Tag mode
+        |:FuzzyFinderTaggedFile| - Tagged-File mode
 
-It is recommended to map these commands. These commands can take initial text
-as a command argument. The text will be entered after Fuzzyfinder launched. If
-a command was executed with a ! modifier (e.g. |:FuzzyFinderTag|!), it enables
-the partial matching instead of the fuzzy matching.
+It is recommended to map these commands. These commands can take initial
+pattern as a command argument. The pattern will be inserted after launching
+Fuzzyfinder. If a command was executed with a ! modifier (e.g.:
+:FuzzyFinderTag!), it enables a partial matching instead of a fuzzy matching.
 
                                                     *fuzzyfinder-manipulation*
 Manipulation ~
@@ -105,7 +104,7 @@ You can open a selected item in various ways:
         <CR>  - opens in a previous window.
         <C-j> - opens in a split window.
         <C-k> - opens in a vertical-split window.
-        <C-]> - opens in a new tab page.
+        <C-l> - opens in a new tab page.
 
 To cancel and return to previous window, leave Insert mode.
 
@@ -184,6 +183,17 @@ Cache ~
 Once a cache was created, It is not automatically updated to speed up the
 response time by default. To update it, use |:FuzzyFinderRenewCache| command.
 
+                                                    *fuzzyfinder-dot-sequence*
+Going Up Parent Directories With Dot Sequence In File/Directory Mode ~
+
+In File/Directory mode, you can go up parent directories with entering dot
+sequence. Dot sequence after a path separator is expanded to "../" sequence.
+
+        Dot sequence    Expanded pattern ~
+        /..             /../
+        /...            /../../
+        /....           /../../../
+
                                                    *fuzzyfinder-bookmark-mode*
 Detail Of Bookmark Mode ~
 
@@ -220,6 +230,91 @@ completion items are files which are included in the current tags. These files
 are related to the current working environment. So this mode is a pseudo
 project mode.
 
+                                               *fuzzyfinder-callbackfile-mode*
+Use of Callback-File Mode ~
+
+Callback-File mode provides an API to find a file and not command interfaces.
+
+API function:
+>
+        function! g:FuzzyFinderMode.CallbackFile.launch_callbacker(
+              \ initial_pattern,
+              \ partial_matching,
+              \ callback_func)
+<
+        initial_pattern  - String which is inserted after launching
+                           Fuzzyfinder.
+        partial_matching - If non-zero, enable a partial matching instead of a
+                           fuzzy matching.
+        callback_func    - Name of function which is called at the end of
+                           Fuzzyfinder. This is called with 2 arguments, a
+                           name of selected item and a number of open method
+                           if completed. Or, called without arguments if
+                           aborted.
+
+Example of use:
+>
+        function! g:echoCallback(...)
+          if a:0
+            echo "Item: " . a:1 . "\nMethod: " . a:2
+          else
+            echo "Canceled"
+          endif
+        endfunction
+
+        " Find a file from current working directory.
+        call g:FuzzyFinderMode.CallbackFile.launch_callbacker(
+              \ '', 0, 'g:echoCallback')
+
+        " Find a file from home directory.
+        call g:FuzzyFinderMode.CallbackFile.launch_callbacker(
+              \ '~/', 0, 'g:echoCallback')
+<
+                                               *fuzzyfinder-callbackitem-mode*
+Use of Callback-Item Mode ~
+
+Callback-Item mode provides an API to select an item from a given list and not
+command interfaces.
+
+API function:
+>
+        function! g:FuzzyFinderMode.CallbackItem.launch_callbacker(
+              \ initial_pattern,
+              \ partial_matching,
+              \ callback_func,
+              \ items,
+              \ for_file)
+<
+        initial_pattern  - String which is inserted after launching
+                           Fuzzyfinder.
+        partial_matching - If non-zero, enable a partial matching instead of a
+                           fuzzy matching.
+        callback_func    - Name of function which is called at the end of
+                           Fuzzyfinder. This is called with 2 arguments, a
+                           name of selected item and a number of open method
+                           if completed. Or, called without arguments if
+                           aborted.
+        items            - List of items.
+        for_fil          - If non-zero, use a matching method for files.
+
+Example of use:
+>
+        function! g:echoCallback(...)
+          if a:0
+            echo "Item: " . a:1 . "\nOpen method: " . a:2
+          else
+            echo "Canceled"
+          endif
+        endfunction
+
+        " Select an item from a given list.
+        call g:FuzzyFinderMode.CallbackItem.launch_callbacker(
+              \ '', 0, 'g:echoCallback', ['ed', 'vi', 'vim'], 0)
+
+        " Select a file from a given list.
+        call g:FuzzyFinderMode.CallbackItem.launch_callbacker(
+              \ '', 0, 'g:echoCallback', ['../foo/bar', 'baz'], 1)
+<
                                                           *fuzzyfinder-migemo*
 What Is Migemo ~
 
@@ -313,7 +408,7 @@ OPTIONS                           *fuzzyfinder-options* *g:FuzzyFinderOptions*
 
 You can set options via |g:FuzzyFinderOptions| which is a |Dictionary|.
 
-Be sure to declare |Dictionaries| for each mode in |g:FuzzyFinderOptions|
+Be sure to allocate |Dictionaries| to each mode in |g:FuzzyFinderOptions|
 before set variables. See |fuzzyfinder-vimrc-sample| also.
 
                     *fuzzyfinder-options-all-mode* *g:FuzzyFinderOptions.Base*
@@ -338,7 +433,7 @@ For All Mode ~
                 open a buffer/file in vertical-split new window.
 
                                    *g:FuzzyFinderOptions.Base.key_open_tab*  >
-        let g:FuzzyFinderOptions.Base.key_open_tab = '<C-]>'
+        let g:FuzzyFinderOptions.Base.key_open_tab = '<C-l>'
 <
                 This is mapped to select completion item or finish input and
                 open a buffer/file in a new tab page.
@@ -447,7 +542,8 @@ For Buffer Mode ~
         let g:FuzzyFinderOptions.Buffer.switch_order = 10
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                                  *g:FuzzyFinderOptions.Buffer.reuse_window*  >
         let g:FuzzyFinderOptions.Buffer.reuse_window = 1
@@ -489,7 +585,8 @@ For File Mode ~
         let g:FuzzyFinderOptions.File.switch_order = 20
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                                    *g:FuzzyFinderOptions.File.reuse_window*  >
         let g:FuzzyFinderOptions.File.reuse_window = 1
@@ -498,8 +595,7 @@ For File Mode ~
                 if non-zero was set.
 
                                   *g:FuzzyFinderOptions.File.excluded_path*  >
-        let g:FuzzyFinderOptions.File.excluded_path =
-              \ '\v\~$|\.o$|\.exe$|\.bak$|\.swp$|((^|[/\\])\.[/\\]$)'
+        let g:FuzzyFinderOptions.File.excluded_path = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$'
 <
                 The items matching this are excluded from the completion list.
 
@@ -531,11 +627,11 @@ For Directory Mode ~
         let g:FuzzyFinderOptions.Dir.switch_order = 30
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                                    *g:FuzzyFinderOptions.Dir.excluded_path*  >
-        let g:FuzzyFinderOptions.Dir.excluded_path =
-              \ '\v(^|[/\\])\.{1,2}[/\\]$'
+        let g:FuzzyFinderOptions.Dir.excluded_path = ''
 <
                 The items matching this are excluded from the completion list.
 
@@ -567,7 +663,8 @@ For Mru-File Mode ~
         let g:FuzzyFinderOptions.MruFile.switch_order = 40
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                                 *g:FuzzyFinderOptions.MruFile.reuse_window*  >
         let g:FuzzyFinderOptions.MruFile.reuse_window = 1
@@ -576,8 +673,7 @@ For Mru-File Mode ~
                 if non-zero was set.
 
                                *g:FuzzyFinderOptions.MruFile.excluded_path*  >
-        let g:FuzzyFinderOptions.MruFile.excluded_path =
-              \ '\v\~$|\.bak$|\.swp$'
+        let g:FuzzyFinderOptions.MruFile.excluded_path = '\v\~$|\.bak$|\.swp$'
 <
                 The items matching this are excluded from the completion list.
 
@@ -614,7 +710,8 @@ For Mru-Cmd Mode ~
         let g:FuzzyFinderOptions.MruCmd.switch_order = 50
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                              *g:FuzzyFinderOptions.MruCmd.excluded_command*  >
         let g:FuzzyFinderOptions.MruCmd.excluded_command = '^$'
@@ -654,7 +751,8 @@ For Bookmark Mode ~
         let g:FuzzyFinderOptions.Bookmark.switch_order = 60
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                                *g:FuzzyFinderOptions.Bookmark.reuse_window*  >
         let g:FuzzyFinderOptions.Bookmark.reuse_window = 1
@@ -696,7 +794,8 @@ For Tag Mode ~
         let g:FuzzyFinderOptions.Tag.switch_order = 70
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
        *fuzzyfinder-options-taggedfile-mode* *g:FuzzyFinderOptions.TaggedFile*
 For Tagged-File Mode ~
@@ -726,7 +825,8 @@ For Tagged-File Mode ~
         let g:FuzzyFinderOptions.TaggedFile.switch_order = 80
 <
                 This is used to sort modes for switching to the next/previous
-                mode.
+                mode. If negative number was set, Fuzzyfinder never switch to
+                this mode.
 
                              *g:FuzzyFinderOptions.TaggedFile.reuse_window*  >
         let g:FuzzyFinderOptions.TaggedFile.reuse_window = 1
@@ -736,10 +836,13 @@ For Tagged-File Mode ~
 
 
 ==============================================================================
-VIMRC EXAMPLE                                      *fuzzyfinder-vimrc-sample*
+VIMRC EXAMPLE                                       *fuzzyfinder-vimrc-sample*
 
 >
-        let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{}, 'MruFile':{}, 'MruCmd':{}, 'Bookmark':{}, 'Tag':{}, 'TaggedFile':{}}
+        let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{},
+              \                      'MruFile':{}, 'MruCmd':{}, 'Bookmark':{},
+              \                      'Tag':{}, 'TaggedFile':{},
+              \                      'CallbackFile':{}, 'CallbackItem':{}, }
         let g:FuzzyFinderOptions.Base.abbrev_map  = {
               \   '^v|' : map(filter(split(&runtimepath, ','), 'v:val !~ "after$"'), 'v:val . "/**/"'),
               \ }
@@ -777,6 +880,20 @@ SPECIAL THANKS                                            *fuzzyfinder-thanks*
 
 ==============================================================================
 CHANGELOG                                              *fuzzyfinder-changelog*
+
+2.21.0:
+  - Improved a method of trimming long completion items. Thanks to Andy,
+    pyrhockz, and Nathan.
+  - Changed not to map command-line <CR> for MRU-Command mode if
+    g:FuzzyFinderOptions.MruCmd.mode_available is set 0 before loading
+    fuzzyfinder.vim.
+  - Added Callback-File mode and Callback-Item mode for third-party script to
+    find a file/directory or an item from a given list using Fuzzyfinder.
+  - Changed not to append ".." to a completion menu in File/Directory mode.
+    Use dot sequence feature.
+  - Changed default value of g:FuzzyFinderOptions.File.excluded_path option.
+  - Changed default value of g:FuzzyFinderOptions.Dir.excluded_path option.
+  - Fixed a bug that couldn't jump to a tag. Thanks to Thinca.
 
 2.20:
   - Added help files which are doc/fuzzyfinder.txt and doc/fuzzyfinder.jax.
