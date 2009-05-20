@@ -1,7 +1,7 @@
 "=============================================================================
 " File:                plugin/fuzzyfinder.vim
 " Author:              Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version:             2.21.0, for Vim 7.1
+" Version:             2.22.0, for Vim 7.1
 " Licence:             MIT Licence
 " GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
@@ -12,7 +12,7 @@
 if exists('g:loaded_fuzzyfinder') || v:version < 701
   finish
 endif
-let g:loaded_fuzzyfinder = 022100 " Version xx.xx.xx
+let g:loaded_fuzzyfinder = 022200 " Version xx.xx.xx
 
 " }}}1
 "=============================================================================
@@ -104,6 +104,18 @@ function! s:TruncateTail(str, len)
   return a:str[:a:len - 1 + len(s:ABBR_TRUNCATION_MARK)] . s:ABBR_TRUNCATION_MARK
 endfunction
 
+" truncates a:str and add a:mark if a length of a:str is more than a:len
+function! s:TruncateMid(str, len)
+  if a:len >= len(a:str)
+    return a:str
+  elseif a:len <= len(s:ABBR_TRUNCATION_MARK)
+    return s:ABBR_TRUNCATION_MARK
+  endif
+  let len_head = (a:len - len(s:ABBR_TRUNCATION_MARK)) / 2
+  let len_tail = a:len - len(s:ABBR_TRUNCATION_MARK) - len_head
+  return a:str[: len_head - 1] . s:ABBR_TRUNCATION_MARK . a:str[-len_tail :]
+endfunction
+
 " takes suffix numer. if no digits, returns -1
 function! s:SuffixNumber(str)
   let s = matchstr(a:str, '\d\+$')
@@ -119,12 +131,12 @@ function! s:ConvertWildcardToRegexp(expr)
   return '\V' . re
 endfunction
 
-" "foo/bar/hoge" -> { head: "foo/bar/", tail: "hoge" }
+" "foo/bar/buz/hoge" -> { head: "foo/bar/buz/", tail: "hoge" }
 function! s:SplitPath(path)
-  let dir = matchstr(a:path, '^.*[/\\]')
+  let head = matchstr(a:path, '^.*[/\\]')
   return  {
-        \   'head' : dir,
-        \   'tail' : a:path[strlen(dir):]
+        \   'head' : head,
+        \   'tail' : a:path[strlen(head):]
         \ }
 endfunction
 
@@ -313,6 +325,7 @@ function! s:EnumExpandedDirsEntries(dir, excluded)
   let dirs = split(expand(substitute(a:dir, '\', '/', 'g')), "\n")
   let entries = s:Concat(map(copy(dirs), 'split(glob(v:val . ".*"), "\n") + ' .
         \                                'split(glob(v:val . "*" ), "\n")'))
+  " removes "*/." and "*/.."
   call filter(entries, 'v:val !~ ''\v(^|[/\\])\.\.?$''')
   call map(entries, 'extend(s:SplitPath(v:val), { "suffix" : (isdirectory(v:val) ? s:PATH_SEPARATOR : "") })')
   if len(a:excluded)
@@ -348,8 +361,6 @@ endfunction
 
 "
 function! s:SetRanks(item, eval_word, eval_base, stats)
-  "let eval_word = (a:is_path ? s:SplitPath(matchstr(a:item.word, '^.*[^/\\]')).tail : a:item.word)
-  "let eval_base = (a:is_path ? s:SplitPath(a:base).tail : a:base)
   let rank_perfect = (a:eval_word == a:eval_base ? 0 : 1)
   if a:eval_word == a:eval_base
     let rank_perfect = 1
@@ -369,26 +380,41 @@ function! s:SetFormattedWordToAbbr(item, max_menu_width)
   return a:item
 endfunction
 
+function! s:MakeFileAbbrInfo(item, max_len_stats)
+  let head = matchstr(a:item.word, '^.*[/\\]\ze.')
+  let a:item.abbr = { 'head' : head,
+        \             'tail' : a:item.word[strlen(head):],
+        \             'key' : head . '.',
+        \             'prefix' : printf('%3d: ', a:item.index), }
+  if exists('a:item.abbr_prefix')
+    let a:item.abbr.prefix .= a:item.abbr_prefix
+  endif
+  let a:item.abbr.len = len(a:item.abbr.prefix) + len(a:item.word)
+  if !exists('a:max_len_stats[a:item.abbr.key]') || a:item.abbr.len > a:max_len_stats[a:item.abbr.key]
+    let a:max_len_stats[a:item.abbr.key] = a:item.abbr.len
+  endif
+  return a:item
+endfunction
+
+
 "
-function! s:SetDataToAbbrForFile(item)
-  let a:item.abbr = s:SplitPath(a:item.word)
-  let a:item.abbr.prefix = printf('%3d: ', a:item.index) . (exists('a:item.abbr_prefix') ? a:item.abbr_prefix : '')
+function! s:GetTruncatedHeads(head, max_len, max_menu_width)
+  return s:TruncateMid(a:head, len(a:head) + a:max_menu_width - a:max_len)
+endfunction
+
+"
+function! s:SetAbbrWithFileAbbrData(item, truncated_heads, max_menu_width)
+  let abbr = a:item.abbr.prefix . a:truncated_heads[a:item.abbr.key] . a:item.abbr.tail
+  let a:item.abbr = s:TruncateTail(abbr, a:max_menu_width)
   return a:item
 endfunction
 
 "
-function! s:FormatAbbrForFile(item, max_menu_width, len_drop)
-  let len_head = len(v:val.abbr.head) - a:len_drop
-  let a:item.abbr = v:val.abbr.prefix . s:TruncateHead(v:val.abbr.head, len_head) . v:val.abbr.tail
-  let a:item.abbr = s:TruncateTail(a:item.abbr, a:max_menu_width)
-  return a:item
-endfunction
-
-"
-function! s:MapToSetFormattedWordToAbbrForFile(items, max_menu_width)
-  let result = map(a:items, 's:SetDataToAbbrForFile(v:val)')
-  let len_drop = max(map(copy(result), 'len(v:val.abbr.prefix . v:val.abbr.head . v:val.abbr.tail)')) - a:max_menu_width
-  return map(a:items, 's:FormatAbbrForFile(v:val, a:max_menu_width, len_drop)')
+function! s:MapToSetAbbrWithFileWord(items, max_menu_width)
+  let max_len_stats = {}
+  call map(a:items, 's:MakeFileAbbrInfo(v:val, max_len_stats)')
+  let truncated_heads = map(max_len_stats, 's:GetTruncatedHeads(v:key[: -2], v:val, a:max_menu_width)')
+  return map(a:items, 's:SetAbbrWithFileAbbrData(v:val, truncated_heads, a:max_menu_width)')
 endfunction
 
 "
@@ -527,7 +553,7 @@ endfunction
 let g:FuzzyFinderMode = { 'Base' : {} }
 
 "
-function! g:FuzzyFinderMode.Base.launch(initial_pattern, partial_matching)
+function! g:FuzzyFinderMode.Base.launch_base(initial_pattern, partial_matching)
   " initializes this object
   call self.extend_options()
   let self.partial_matching = a:partial_matching
@@ -601,7 +627,7 @@ function! g:FuzzyFinderMode.Base.on_insert_leave()
   " switchs to next mode, or finishes fuzzyfinder.
   if exists('s:reserved_switch_mode')
     let m = self.next_mode(s:reserved_switch_mode < 0)
-    call m.launch(last_pattern, self.partial_matching)
+    call m.launch_base(last_pattern, self.partial_matching)
     unlet s:reserved_switch_mode
   endif
 endfunction
@@ -832,7 +858,7 @@ function! g:FuzzyFinderMode.Buffer.on_mode_enter_post()
   if self.mru_order
     call s:MapToSetSerialIndex(sort(self.items, 's:CompareTimeDescending'), 1)
   endif
-  let self.items = s:MapToSetFormattedWordToAbbrForFile(self.items, self.max_menu_width)
+  let self.items = s:MapToSetAbbrWithFileWord(self.items, self.max_menu_width)
 endfunction
 
 "
@@ -894,7 +920,7 @@ function! g:FuzzyFinderMode.File.cached_glob(dir, file, excluded, index, limit)
   echo 'Filtering file list...'
   let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
   call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
-  return s:MapToSetFormattedWordToAbbrForFile(result, self.max_menu_width)
+  return s:MapToSetAbbrWithFileWord(result, self.max_menu_width)
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.Dir ----------------------------------------- {{{1
@@ -929,7 +955,7 @@ function! g:FuzzyFinderMode.Dir.cached_glob_dir(dir, file, excluded, index, limi
   echo 'Filtering file list...'
   let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
   call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
-  return s:MapToSetFormattedWordToAbbrForFile(result, self.max_menu_width)
+  return s:MapToSetAbbrWithFileWord(result, self.max_menu_width)
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.MruFile ------------------------------------- {{{1
@@ -950,7 +976,7 @@ function! g:FuzzyFinderMode.MruFile.on_mode_enter_post()
   let self.items = map(self.items, 'self.format_item_using_cache(v:val)')
   let self.items = filter(self.items, '!empty(v:val) && bufnr("^" . v:val.word . "$") != self.prev_bufnr')
   let self.items = s:MapToSetSerialIndex(self.items, 1)
-  let self.items = s:MapToSetFormattedWordToAbbrForFile(self.items, self.max_menu_width)
+  let self.items = s:MapToSetAbbrWithFileWord(self.items, self.max_menu_width)
 endfunction
 
 "
@@ -1171,16 +1197,101 @@ function! g:FuzzyFinderMode.TaggedFile.find_tagged_file(pattern, index, limit)
   echo 'Filtering tagged-file list...'
   call map(self.cache[key].items, 's:ModifyWordAsFilename(v:val, '':.'')')
   let result = s:FilterMatching(self.cache[key].items, 'word', a:pattern, a:index, a:limit)
-  return s:MapToSetFormattedWordToAbbrForFile(result, self.max_menu_width)
+  return s:MapToSetAbbrWithFileWord(result, self.max_menu_width)
+endfunction
+
+" OBJECT: g:FuzzyFinderMode.GivenFile ----------------------------------- {{{1
+let g:FuzzyFinderMode.GivenFile = copy(g:FuzzyFinderMode.Base)
+
+"
+function! g:FuzzyFinderMode.GivenFile.launch(initial_pattern, partial_matching, items)
+  let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call.self.launch_base(a:initial_pattern, a:partial_matching)
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenFile.on_complete(base)
+  let patterns = self.make_pattern(a:base)
+  let base_tail = s:SplitPath(a:base).tail
+  let stats = self.get_filtered_stats(a:base)
+  let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, base_tail, stats)')
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenFile.on_open(expr, mode)
+  call s:OpenFile(a:expr, a:mode, self.reuse_window)
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenFile.on_switch_mode(next_prev)
+  " mode switching is unavailable
+endfunction
+
+" OBJECT: g:FuzzyFinderMode.GivenDir  ----------------------------------- {{{1
+let g:FuzzyFinderMode.GivenDir = copy(g:FuzzyFinderMode.Base)
+
+"
+function! g:FuzzyFinderMode.GivenDir.launch(initial_pattern, partial_matching, items)
+  let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call.self.launch_base(a:initial_pattern, a:partial_matching)
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenDir.on_complete(base)
+  let patterns = self.make_pattern(a:base)
+  let stats = self.get_filtered_stats(a:base)
+  let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:SetRanks(v:val, v:val.word, a:base, stats)')
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenDir.on_open(expr, mode)
+  execute ':cd ' . s:EscapeFilename(a:expr)
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenDir.on_switch_mode(next_prev)
+  " mode switching is unavailable
+endfunction
+
+" OBJECT: g:FuzzyFinderMode.GivenCmd ------------------------------------ {{{1
+let g:FuzzyFinderMode.GivenCmd = copy(g:FuzzyFinderMode.Base)
+
+"
+function! g:FuzzyFinderMode.GivenCmd.launch(initial_pattern, partial_matching, items)
+  let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call.self.launch_base(a:initial_pattern, a:partial_matching)
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenCmd.on_complete(base)
+  let patterns = self.make_pattern(a:base)
+  let stats = self.get_filtered_stats(a:base)
+  let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
+  return map(result, 's:SetRanks(v:val, v:val.word, a:base, stats)')
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenCmd.on_open(expr, mode)
+  if a:expr[0] =~ '[:/?]'
+    call histadd(a:expr[0], a:expr[1:])
+  endif
+  call feedkeys(a:expr . "\<CR>", 'n')
+endfunction
+
+"
+function! g:FuzzyFinderMode.GivenCmd.on_switch_mode(next_prev)
+  " mode switching is unavailable
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.CallbackFile -------------------------------- {{{1
 let g:FuzzyFinderMode.CallbackFile = copy(g:FuzzyFinderMode.Base)
 
 "
-function! g:FuzzyFinderMode.CallbackFile.launch_callbacker(initial_pattern, partial_matching, callback_func)
-  let self.callback_func = a:callback_func
-  call.self.launch(a:initial_pattern, a:partial_matching)
+function! g:FuzzyFinderMode.CallbackFile.launch(initial_pattern, partial_matching, listener)
+  let self.listener = a:listener
+  call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
 
 "
@@ -1195,7 +1306,7 @@ endfunction
 
 "
 function! g:FuzzyFinderMode.CallbackFile.on_open(expr, mode)
-  call eval(printf('%s(%s, %d)', self.callback_func, string(a:expr), a:mode))
+  call self.listener.onComplete(a:expr, a:mode)
 endfunction
 
 "
@@ -1206,7 +1317,7 @@ endfunction
 "
 function! g:FuzzyFinderMode.CallbackFile.on_mode_leave_post(opened)
   if !a:opened
-    call eval(printf('%s()', self.callback_func))
+    call self.listener.onAbort()
   endif
 endfunction
 
@@ -1225,18 +1336,18 @@ function! g:FuzzyFinderMode.CallbackFile.cached_glob(dir, file, excluded, index,
   echo 'Filtering file list...'
   let result = s:FilterMatching(self.cache[key], 'tail', a:file, a:index, a:limit)
   call map(result, '{ "index" : v:val.index, "word" : (v:val.head == key ? a:dir : v:val.head) . v:val.tail . v:val.suffix }') 
-  return s:MapToSetFormattedWordToAbbrForFile(result, self.max_menu_width)
+  return s:MapToSetAbbrWithFileWord(result, self.max_menu_width)
 endfunction
 
 " OBJECT: g:FuzzyFinderMode.CallbackItem -------------------------------- {{{1
 let g:FuzzyFinderMode.CallbackItem = copy(g:FuzzyFinderMode.Base)
 
 "
-function! g:FuzzyFinderMode.CallbackItem.launch_callbacker(initial_pattern, partial_matching, callback_func, items, for_file)
-  let self.callback_func = a:callback_func
+function! g:FuzzyFinderMode.CallbackItem.launch(initial_pattern, partial_matching, listener, items, for_file)
+  let self.listener = a:listener
   let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
   let self.on_complete = (a:for_file ? self.on_complete_file : self.on_complete_nonfile)
-  call.self.launch(a:initial_pattern, a:partial_matching)
+  call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
 
 "
@@ -1258,7 +1369,7 @@ endfunction
 
 "
 function! g:FuzzyFinderMode.CallbackItem.on_open(expr, mode)
-  call eval(printf('%s(%s, %d)', self.callback_func, string(a:expr), a:mode))
+  call self.listener.onComplete(a:expr, a:mode)
 endfunction
 
 "
@@ -1269,7 +1380,7 @@ endfunction
 "
 function! g:FuzzyFinderMode.CallbackItem.on_mode_leave_post(opened)
   if !a:opened
-    call eval(printf('%s()', self.callback_func))
+    call self.listener.onAbort()
   endif
 endfunction
 
@@ -1438,6 +1549,7 @@ let s:user_options = (exists('g:FuzzyFinderOptions') ? g:FuzzyFinderOptions : {}
 let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{},
       \                      'MruFile':{}, 'MruCmd':{}, 'Bookmark':{},
       \                      'Tag':{}, 'TaggedFile':{},
+      \                      'GivenFile':{}, 'GivenDir':{}, 'GivenCmd':{},
       \                      'CallbackFile':{}, 'CallbackItem':{}, }
 "-----------------------------------------------------------------------------
 let g:FuzzyFinderOptions.Base.key_open          = '<CR>'
@@ -1519,6 +1631,25 @@ let g:FuzzyFinderOptions.TaggedFile.smart_bs         = 0
 let g:FuzzyFinderOptions.TaggedFile.switch_order     = 80
 let g:FuzzyFinderOptions.TaggedFile.reuse_window     = 1
 "-----------------------------------------------------------------------------
+let g:FuzzyFinderOptions.GivenFile.mode_available   = 1
+let g:FuzzyFinderOptions.GivenFile.prompt           = '>GivenFile>'
+let g:FuzzyFinderOptions.GivenFile.prompt_highlight = 'Question'
+let g:FuzzyFinderOptions.GivenFile.smart_bs         = 0
+let g:FuzzyFinderOptions.GivenFile.switch_order     = -1
+let g:FuzzyFinderOptions.GivenFile.reuse_window     = 1
+"-----------------------------------------------------------------------------
+let g:FuzzyFinderOptions.GivenDir.mode_available   = 1
+let g:FuzzyFinderOptions.GivenDir.prompt           = '>GivenDir>'
+let g:FuzzyFinderOptions.GivenDir.prompt_highlight = 'Question'
+let g:FuzzyFinderOptions.GivenDir.smart_bs         = 0
+let g:FuzzyFinderOptions.GivenDir.switch_order     = -1
+"-----------------------------------------------------------------------------
+let g:FuzzyFinderOptions.GivenCmd.mode_available   = 1
+let g:FuzzyFinderOptions.GivenCmd.prompt           = '>GivenCmd>'
+let g:FuzzyFinderOptions.GivenCmd.prompt_highlight = 'Question'
+let g:FuzzyFinderOptions.GivenCmd.smart_bs         = 0
+let g:FuzzyFinderOptions.GivenCmd.switch_order     = -1
+"-----------------------------------------------------------------------------
 let g:FuzzyFinderOptions.CallbackFile.mode_available   = 1
 let g:FuzzyFinderOptions.CallbackFile.prompt           = '>CallbackFile>'
 let g:FuzzyFinderOptions.CallbackFile.prompt_highlight = 'Question'
@@ -1531,6 +1662,7 @@ let g:FuzzyFinderOptions.CallbackItem.prompt           = '>CallbackItem>'
 let g:FuzzyFinderOptions.CallbackItem.prompt_highlight = 'Question'
 let g:FuzzyFinderOptions.CallbackItem.smart_bs         = 0
 let g:FuzzyFinderOptions.CallbackItem.switch_order     = -1
+"-----------------------------------------------------------------------------
 
 " overwrites default values of g:FuzzyFinderOptions with user-defined values - {{{2
 call map(s:user_options, 'extend(g:FuzzyFinderOptions[v:key], v:val, ''force'')')
@@ -1560,19 +1692,19 @@ if s:IsAvailableMode(g:FuzzyFinderMode.MruCmd)
   cmap <silent> <expr> <CR> <SID>OnCmdCR()
 endif
 
-command! -bang -narg=? -complete=buffer FuzzyFinderBuffer                    call g:FuzzyFinderMode.Buffer.launch    (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderFile                      call g:FuzzyFinderMode.File.launch      (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderFileWithFullCwd           call g:FuzzyFinderMode.File.launch      (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderFileWithCurrentBufferDir  call g:FuzzyFinderMode.File.launch      (expand('%:~:.')[:-1-len(expand('%:~:.:t'))] . <q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=dir    FuzzyFinderDir                       call g:FuzzyFinderMode.Dir.launch       (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=dir    FuzzyFinderDirWithFullCwd            call g:FuzzyFinderMode.Dir.launch       (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=dir    FuzzyFinderDirWithCurrentBufferDir   call g:FuzzyFinderMode.Dir.launch       (expand('%:p:~')[:-1-len(expand('%:p:~:t'))] . <q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderMruFile                   call g:FuzzyFinderMode.MruFile.launch   (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderMruCmd                    call g:FuzzyFinderMode.MruCmd.launch    (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderBookmark                  call g:FuzzyFinderMode.Bookmark.launch  (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=tag    FuzzyFinderTag                       call g:FuzzyFinderMode.Tag.launch       (<q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=tag    FuzzyFinderTagWithCursorWord         call g:FuzzyFinderMode.Tag.launch       (expand('<cword>') . <q-args>, len(<q-bang>))
-command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile                call g:FuzzyFinderMode.TaggedFile.launch(<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=buffer FuzzyFinderBuffer                    call g:FuzzyFinderMode.Buffer.launch_base    (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFile                      call g:FuzzyFinderMode.File.launch_base      (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFileWithFullCwd           call g:FuzzyFinderMode.File.launch_base      (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderFileWithCurrentBufferDir  call g:FuzzyFinderMode.File.launch_base      (expand('%:~:.')[:-1-len(expand('%:~:.:t'))] . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDir                       call g:FuzzyFinderMode.Dir.launch_base       (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDirWithFullCwd            call g:FuzzyFinderMode.Dir.launch_base       (fnamemodify(getcwd(), ':p') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=dir    FuzzyFinderDirWithCurrentBufferDir   call g:FuzzyFinderMode.Dir.launch_base       (expand('%:p:~')[:-1-len(expand('%:p:~:t'))] . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderMruFile                   call g:FuzzyFinderMode.MruFile.launch_base   (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderMruCmd                    call g:FuzzyFinderMode.MruCmd.launch_base    (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderBookmark                  call g:FuzzyFinderMode.Bookmark.launch_base  (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=tag    FuzzyFinderTag                       call g:FuzzyFinderMode.Tag.launch_base       (<q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=tag    FuzzyFinderTagWithCursorWord         call g:FuzzyFinderMode.Tag.launch_base       (expand('<cword>') . <q-args>, len(<q-bang>))
+command! -bang -narg=? -complete=file   FuzzyFinderTaggedFile                call g:FuzzyFinderMode.TaggedFile.launch_base(<q-args>, len(<q-bang>))
 command! -bang -narg=?                  FuzzyFinderAddBookmark               call g:FuzzyFinderMode.Bookmark.bookmark_here(<q-args>)
 command! -bang -narg=0 -range           FuzzyFinderAddBookmarkAsSelectedText call g:FuzzyFinderMode.Bookmark.bookmark_here(s:SelectedText())
 command! -bang -narg=0                  FuzzyFinderEditInfo                  call s:InfoFileManager.edit()

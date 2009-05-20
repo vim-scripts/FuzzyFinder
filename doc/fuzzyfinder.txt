@@ -42,15 +42,16 @@ Fuzzyfinder supports multibyte characters.
 ==============================================================================
 INSTALLATION                                        *fuzzyfinder-installation*
 
-If you have the zip file, extract it to your runtime directory.
+Put all files into your runtime directory. If you have the zip file, extract
+it to your runtime directory.
 
-You should have the following files:
+You should place the files as follows:
 >
         <your runtime directory>/plugin/fuzzyfinder.vim
         <your runtime directory>/doc/fuzzyfinder.txt
         <your runtime directory>/doc/fuzzyfinder.jax
 <
-And then update your tags file to enable fuzzyfinder help. See
+And then update your help tags files to enable fuzzyfinder help. See
 |add-local-help| for details.
 
 ==============================================================================
@@ -230,58 +231,148 @@ completion items are files which are included in the current tags. These files
 are related to the current working environment. So this mode is a pseudo
 project mode.
 
-                                               *fuzzyfinder-callbackfile-mode*
-Use of Callback-File Mode ~
+                                                  *fuzzyfinder-givenfile-mode*
+Use of Given-File Mode ~
 
-Callback-File mode provides an API to find a file and not command interfaces.
+Given-File mode provides an API to open a selected file from a given list.
 
 API function:
 >
-        function! g:FuzzyFinderMode.CallbackFile.launch_callbacker(
+        function! g:FuzzyFinderMode.GivenFile.launch(
               \ initial_pattern,
               \ partial_matching,
-              \ callback_func)
+              \ items)
 <
         initial_pattern  - String which is inserted after launching
                            Fuzzyfinder.
         partial_matching - If non-zero, enable a partial matching instead of a
                            fuzzy matching.
-        callback_func    - Name of function which is called at the end of
-                           Fuzzyfinder. This is called with 2 arguments, a
-                           name of selected item and a number of open method
-                           if completed. Or, called without arguments if
-                           aborted.
+        items            - List of items.
 
 Example of use:
 >
-        function! g:echoCallback(...)
-          if a:0
-            echo "Item: " . a:1 . "\nMethod: " . a:2
-          else
-            echo "Canceled"
-          endif
+        " Open your dotfile.
+        call g:FuzzyFinderMode.GivenFile.launch(
+              \ '', 0, split(glob('~/.*'), "\n"))
+<
+                                                   *fuzzyfinder-givendir-mode*
+Use of Given-Directory Mode ~
+
+Given-Directory mode provides an API to change current working directory to a
+selected one from a given list.
+
+API function:
+>
+        function! g:FuzzyFinderMode.GivenDir.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ items)
+<
+        initial_pattern  - String which is inserted after launching
+                           Fuzzyfinder.
+        partial_matching - If non-zero, enable a partial matching instead of a
+                           fuzzy matching.
+        items            - List of items.
+
+
+Example of use:
+>
+        " Change current working directory to one of your runtime directory.
+        call g:FuzzyFinderMode.GivenDir.launch(
+              \ '', 0, split(&runtimepath, ','))
+<
+                                                   *fuzzyfinder-givencmd-mode*
+Use of Given-Command Mode ~
+
+Given-Command mode provides an API to execute a selected command from a given
+list.
+
+A selected command is executed by |feedkeys()|, so it is able to emulate a
+series of key input in Normal mode.
+
+API function:
+>
+        function! g:FuzzyFinderMode.GivenCmd.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ items)
+<
+        initial_pattern  - String which is inserted after launching
+                           Fuzzyfinder.
+        partial_matching - If non-zero, enable a partial matching instead of a
+                           fuzzy matching.
+        items            - List of items.
+
+
+Example of use:
+>
+        function GetAllCommands()
+          redir => commands
+          silent command
+          redir END
+          return map((split(commands, "\n")[3:]),
+              \      '":" . matchstr(v:val, ''^....\zs\S*'')')
+        endfunction
+
+        " select a command from all user-defined commands and execute
+        call g:FuzzyFinderMode.GivenCmd.launch(
+              \ '', 0, GetAllCommands())
+
+<
+                                               *fuzzyfinder-callbackfile-mode*
+Use of Callback-File Mode ~
+
+Callback-File mode provides an API to find and select a file.
+
+API function:
+>
+        function! g:FuzzyFinderMode.CallbackFile.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ listener)
+<
+        initial_pattern  - String which is inserted after launching
+                           Fuzzyfinder.
+        partial_matching - If non-zero, enable a partial matching instead of a
+                           fuzzy matching.
+        listener         - |Dictionary| which has 'onComplete' and 'onAbort'.
+                           They are called at the end of Fuzzyfinder.
+                           listener.onComplete(item, method) is called with 2
+                           arguments which are a name of selected item and a
+                           number of open method when completed.
+                           listener.onAbort() is called when aborted.
+
+Example of use:
+>
+        let listener = {}
+
+        function! listener.onComplete(item, method)
+          echo "Item: " . a:item . "\nMethod: " . a:method
+        endfunction
+
+        function! listener.onAbort()
+          echo "Abort"
         endfunction
 
         " Find a file from current working directory.
-        call g:FuzzyFinderMode.CallbackFile.launch_callbacker(
-              \ '', 0, 'g:echoCallback')
+        call g:FuzzyFinderMode.CallbackFile.launch(
+              \ '', 0, listener)
 
         " Find a file from home directory.
-        call g:FuzzyFinderMode.CallbackFile.launch_callbacker(
-              \ '~/', 0, 'g:echoCallback')
+        call g:FuzzyFinderMode.CallbackFile.launch(
+              \ '~/', 0, listener)
 <
                                                *fuzzyfinder-callbackitem-mode*
 Use of Callback-Item Mode ~
 
-Callback-Item mode provides an API to select an item from a given list and not
-command interfaces.
+Callback-Item mode provides an API to select an item from a given list.
 
 API function:
 >
-        function! g:FuzzyFinderMode.CallbackItem.launch_callbacker(
+        function! g:FuzzyFinderMode.CallbackItem.launch(
               \ initial_pattern,
               \ partial_matching,
-              \ callback_func,
+              \ listener,
               \ items,
               \ for_file)
 <
@@ -289,31 +380,34 @@ API function:
                            Fuzzyfinder.
         partial_matching - If non-zero, enable a partial matching instead of a
                            fuzzy matching.
-        callback_func    - Name of function which is called at the end of
-                           Fuzzyfinder. This is called with 2 arguments, a
-                           name of selected item and a number of open method
-                           if completed. Or, called without arguments if
-                           aborted.
+        listener         - |Dictionary| which has 'onComplete' and 'onAbort'.
+                           They are called at the end of Fuzzyfinder.
+                           listener.onComplete(item, method) is called with 2
+                           arguments which are a name of selected item and a
+                           number of open method when completed.
+                           listener.onAbort() is called when aborted.
         items            - List of items.
         for_fil          - If non-zero, use a matching method for files.
 
 Example of use:
 >
-        function! g:echoCallback(...)
-          if a:0
-            echo "Item: " . a:1 . "\nOpen method: " . a:2
-          else
-            echo "Canceled"
-          endif
+        let listener = {}
+
+        function! listener.onComplete(item, method)
+          echo "Item: " . a:item . "\nMethod: " . a:method
+        endfunction
+
+        function! listener.onAbort()
+          echo "Abort"
         endfunction
 
         " Select an item from a given list.
-        call g:FuzzyFinderMode.CallbackItem.launch_callbacker(
-              \ '', 0, 'g:echoCallback', ['ed', 'vi', 'vim'], 0)
+        call g:FuzzyFinderMode.CallbackItem.launch(
+              \ '', 0, listener, ['ed', 'vi', 'vim'], 0)
 
         " Select a file from a given list.
-        call g:FuzzyFinderMode.CallbackItem.launch_callbacker(
-              \ '', 0, 'g:echoCallback', ['../foo/bar', 'baz'], 1)
+        call g:FuzzyFinderMode.CallbackItem.launch(
+              \ '', 0, listener, ['../foo/bar', 'baz'], 1)
 <
                                                           *fuzzyfinder-migemo*
 What Is Migemo ~
@@ -842,11 +936,11 @@ VIMRC EXAMPLE                                       *fuzzyfinder-vimrc-sample*
         let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{},
               \                      'MruFile':{}, 'MruCmd':{}, 'Bookmark':{},
               \                      'Tag':{}, 'TaggedFile':{},
+              \                      'GivenFile':{}, 'GivenDir':{},
               \                      'CallbackFile':{}, 'CallbackItem':{}, }
         let g:FuzzyFinderOptions.Base.abbrev_map  = {
               \   '^v|' : map(filter(split(&runtimepath, ','), 'v:val !~ "after$"'), 'v:val . "/**/"'),
               \ }
-        let g:FuzzyFinderOptions.MruFile.max_item = 300
         let g:FuzzyFinderOptions.MruCmd.max_item = 400
         nnoremap <silent> <C-n>      :FuzzyFinderBuffer<CR>
         nnoremap <silent> <C-p>      :FuzzyFinderFileWithCurrentBufferDir<CR>
@@ -880,6 +974,16 @@ SPECIAL THANKS                                            *fuzzyfinder-thanks*
 
 ==============================================================================
 CHANGELOG                                              *fuzzyfinder-changelog*
+
+2.22.0:
+  - More improved the abbreviation method for long completion items.
+  - Added Given-File mode for third-party script to select a file from a given
+    list and open.
+  - Added Given-Directory mode for third-party script to select a directory
+    from a given list and change current working directory to it.
+  - Added Given-Command mode for third-party script to select a command from a
+    given list and execute.
+  - Changed ways to launch Callback-File mode and Callback-item mode.
 
 2.21.0:
   - Improved a method of trimming long completion items. Thanks to Andy,

@@ -232,18 +232,175 @@ Tagged-File モード ~
 補完アイテムは tags ファイルに含まれるファイルです。これらのファイルは作業環境
 に関連しているので、一種のプロジェクトモードです。
 
+                                                  *fuzzyfinder-givenfile-mode*
+Given-File モードの利用 ~
+
+Given-File モードは与えられたリストから選択されたファイルを開くための API を提
+供します。
+
+API 関数:
+>
+        function! g:FuzzyFinderMode.GivenFile.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ items)
+<
+        initial_pattern  - Fuzzyfinder 起動直後に挿入される文字列
+        partial_matching - マッチングではなく部分一致マッチングを行うか
+        items            - アイテムのリスト
+
+使用例:
+>
+        " ドットファイルを開く
+        call g:FuzzyFinderMode.GivenFile.launch(
+              \ '', 0, split(glob('~/.*'), "\n"))
+<
+                                                   *fuzzyfinder-givendir-mode*
+Given-Directory モードの利用 ~
+
+Given-Directory モードは与えられたリストから選択されたディレクトリにカレントデ
+ィレクトリを変更するための API を提供します。
+
+API 関数:
+>
+        function! g:FuzzyFinderMode.GivenDir.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ items)
+<
+        initial_pattern  - Fuzzyfinder 起動直後に挿入される文字列
+        partial_matching - マッチングではなく部分一致マッチングを行うか
+        items            - アイテムのリスト
+
+使用例:
+>
+        " ランタイムディレクトリのどれかをカレントディレクトリにする
+        call g:FuzzyFinderMode.GivenDir.launch(
+              \ '', 0, split(&runtimepath, ','))
+<
+                                                   *fuzzyfinder-givencmd-mode*
+Given-Command モードの利用 ~
+
+Given-Command モードは与えられたリストから選択されたコマンドを実行するための
+API を提供します。
+
+選択されたコマンドは feedkeys() によって実行されるので、ノーマルモードでの一連
+のキー入力をエミュレートさせることも可能です。
+
+API 関数:
+>
+        function! g:FuzzyFinderMode.GivenCmd.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ items)
+<
+        initial_pattern  - Fuzzyfinder 起動直後に挿入される文字列
+        partial_matching - マッチングではなく部分一致マッチングを行うか
+        items            - アイテムのリスト
+
+
+使用例:
+>
+        function GetAllCommands()
+          redir => commands
+          silent command
+          redir END
+          return map((split(commands, "\n")[3:]),
+              \      '":" . matchstr(v:val, ''^....\zs\S*'')')
+        endfunction
+
+        " 全てのユーザー定義コマンドのリストからコマンドを選択して実行
+        call g:FuzzyFinderMode.GivenCmd.launch(
+              \ '', 0, GetAllCommands())
+
+<
                                                *fuzzyfinder-callbackfile-mode*
 Callback-File モードの利用 ~
 
-Callback-File モードはファイルを探すための API を提供します。コマンドインター
-フェースはありません。
+Callback-File モードはファイルを探して選択するための API を提供します。
 
+API 関数:
+>
+        function! g:FuzzyFinderMode.CallbackFile.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ listener)
+<
+        initial_pattern  - Fuzzyfinder 起動直後に挿入される文字列
+        partial_matching - マッチングではなく部分一致マッチングを行うか
+        listener         - 'onComplete' と 'onAbort' を持つ|Dictionary|。これ
+                           らは Fuzzyfinder 終了時に呼ばれます。
+                           listener.onComplete(item, method) は選択が完了した
+                           とき、選択されたアイテム名とオープン方式番号の2引数
+                           と共に呼ばれます。listener.onAbort() は選択を中止し
+                           たときに呼ばれます。
+
+使用例:
+>
+        let listener = {}
+
+        function! listener.onComplete(item, method)
+          echo "Item: " . a:item . "\nMethod: " . a:method
+        endfunction
+
+        function! listener.onAbort()
+          echo "Abort"
+        endfunction
+
+        " カレントディレクトリからファイルを選択
+        call g:FuzzyFinderMode.CallbackFile.launch(
+              \ '', 0, listener)
+
+        " ホームディレクトリからファイルを選択
+        call g:FuzzyFinderMode.CallbackFile.launch(
+              \ '~/', 0, listener)
+<
                                                *fuzzyfinder-callbackitem-mode*
 Callback-Item モードの利用 ~
 
-Callback-Item モードは与えられたリストからアイテムを選択するためのを API を提
-供します。コマンドインターフェースはありません。
+Callback-Item モードは与えられたリストからアイテムを選択するための API を提供
+します。
 
+API 関数:
+>
+        function! g:FuzzyFinderMode.CallbackItem.launch(
+              \ initial_pattern,
+              \ partial_matching,
+              \ listener,
+              \ items,
+              \ for_file)
+<
+        initial_pattern  - Fuzzyfinder 起動直後に挿入される文字列
+        partial_matching - マッチングではなく部分一致マッチングを行うか
+        listener         - 'onComplete' と 'onAbort' を持つ|Dictionary|。これ
+                           らは Fuzzyfinder 終了時に呼ばれます。
+                           listener.onComplete(item, method) は選択が完了した
+                           とき、選択されたアイテム名とオープン方式番号の2引数
+                           と共に呼ばれます。listener.onAbort() は選択を中止し
+                           たときに呼ばれます。
+        items            - アイテムのリスト
+        for_file         - ファイル選択に特化したマッチングを利用するか
+
+使用例:
+>
+        let listener = {}
+
+        function! listener.onComplete(item, method)
+          echo "Item: " . a:item . "\nMethod: " . a:method
+        endfunction
+
+        function! listener.onAbort()
+          echo "Abort"
+        endfunction
+
+        " 与えられたリストからアイテムを選択
+        call g:FuzzyFinderMode.CallbackItem.launch(
+              \ '', 0, listener, ['ed', 'vi', 'vim'], 0)
+
+        " 与えられたリストからファイルを選択
+        call g:FuzzyFinderMode.CallbackItem.launch(
+              \ '', 0, listener, ['../foo/bar', 'baz'], 1)
+<
                                                           *fuzzyfinder-migemo*
 Migemo とは ~
 
