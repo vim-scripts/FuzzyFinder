@@ -2,6 +2,15 @@
 
 Fuzzyfinder                                                      *fuzzyfinder*
 
+INTRODUCTION                    |fuzzyfinder-introduction|
+INSTALLATION                    |fuzzyfinder-installation|
+USAGE                           |fuzzyfinder-usage|
+OPTIONS                         |fuzzyfinder-options|
+VIMRC EXAMPLE                   |fuzzyfinder-vimrc-sample|
+SPECIAL THANKS                  |fuzzyfinder-thanks|
+CHANGELOG                       |fuzzyfinder-changelog|
+ABOUT                           |fuzzyfinder-about|
+
 ==============================================================================
 INTRODUCTION                                        *fuzzyfinder-introduction*
 
@@ -152,21 +161,25 @@ Instead, if you want the directory of current buffer and not current directory:
                       *fuzzyfinder-abbreviation* *fuzzyfinder-multiple-search*
 Abbreviations And Multiple Search ~
 
-You can use abbreviations and multiple search in each mode. For example, set
-as below:
+You can use abbreviations and multiple search in all modes by setting
+|g:FuzzyFinderOptions.Base.abbrev_map| option.
+
+For example, set as below:
 >
         let g:FuzzyFinderOptions.Base.abbrev_map  = {
-              \   "^WORK" : [
-              \     "~/project/**/src/",
-              \     ".vim/plugin/",
+              \   "^doc:" : [
+              \     "~/project/**/doc/",
+              \     ".vim/doc/",
               \   ],
               \ }
 <
-And type "WORKtxt" in file-mode Fuzzyfinder, then it searches by following
+and enter "doc:txt" in File mode, then Fuzzyfinder searches by following
 patterns:
 
-        "~/project/**/src/*t*x*t*"
-        ".vim/plugin/*t*x*t*"
+        "~/project/**/doc/*t*x*t*"
+        ".vim/doc/*t*x*t*"
+
+and show concatenated search results.
 
                                                 *fuzzyfinder-information-file*
 Information File ~
@@ -939,7 +952,8 @@ VIMRC EXAMPLE                                       *fuzzyfinder-vimrc-sample*
               \                      'GivenFile':{}, 'GivenDir':{},
               \                      'CallbackFile':{}, 'CallbackItem':{}, }
         let g:FuzzyFinderOptions.Base.abbrev_map  = {
-              \   '^v|' : map(filter(split(&runtimepath, ','), 'v:val !~ "after$"'), 'v:val . "/**/"'),
+              \   '^m0:' : [ '/mnt/d/0/', '/mnt/j/0/' ],
+              \   '^vr:' : map(filter(split(&runtimepath, ','), 'v:val !~ "after$"'), 'v:val . "/**/"'),
               \ }
         let g:FuzzyFinderOptions.MruCmd.max_item = 400
         nnoremap <silent> <C-n>      :FuzzyFinderBuffer<CR>
@@ -974,6 +988,12 @@ SPECIAL THANKS                                            *fuzzyfinder-thanks*
 
 ==============================================================================
 CHANGELOG                                              *fuzzyfinder-changelog*
+
+2.22.1:
+  - Fixed a bug that Fuzzyfinder could not expand abbreviations to patterns
+    including '\' correctly.
+  - Fixed to show item number in Given-File, Given-Directory, and
+    Given-Command mode.
 
 2.22.0:
   - More improved the abbreviation method for long completion items.

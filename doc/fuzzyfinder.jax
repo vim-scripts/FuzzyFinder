@@ -2,6 +2,15 @@
 
 Fuzzyfinder                                                      *fuzzyfinder*
 
+概要                            |fuzzyfinder-introduction|
+インストール                    |fuzzyfinder-installation|
+使い方                          |fuzzyfinder-usage|
+オプション                      |fuzzyfinder-options|
+VIMRC EXAMPLE                   |fuzzyfinder-vimrc-sample|
+SPECIAL THANKS                  |fuzzyfinder-thanks|
+CHANGELOG                       |fuzzyfinder-changelog|
+あばうと                        |fuzzyfinder-about|
+
 ==============================================================================
 概要                                                *fuzzyfinder-introduction*
 
@@ -157,20 +166,23 @@ Fuzzyfinderのバッファを"Error"グループでハイライトします。
                       *fuzzyfinder-abbreviation* *fuzzyfinder-multiple-search*
 短縮入力及び複合検索 ~
 
-各モードで短縮入力と複合検索が利用できます。例えば次のように設定したとします:
+|g:FuzzyFinderOptions.Base.abbrev_map|を設定することで、全モードで短縮入力と複
+合検索が利用できます。
+
+例えば次のように設定したとします:
 >
         let g:FuzzyFinderOptions.Base.abbrev_map  = {
-              \   "^WORK" : [
-              \     "~/project/**/src/",
-              \     ".vim/plugin/",
+              \   "^doc:" : [
+              \     "~/project/**/doc/",
+              \     ".vim/doc/",
               \   ],
               \ }
 <
-そしてFile モードで "WORKtxt" と入力すると、次の2つのパターンの検索結果を複合
+そして File モードで "doc:txt" と入力すると、次の2つのパターンの検索結果を複合
 します:
 
-        "~/project/**/src/*t*x*t*"
-        ".vim/plugin/*t*x*t*"
+        "~/project/**/doc/*t*x*t*"
+        ".vim/doc/*t*x*t*"
 
                                                 *fuzzyfinder-information-file*
 情報ファイル ~

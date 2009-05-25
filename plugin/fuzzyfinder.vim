@@ -1,7 +1,7 @@
 "=============================================================================
 " File:                plugin/fuzzyfinder.vim
 " Author:              Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version:             2.22.0, for Vim 7.1
+" Version:             2.22.1, for Vim 7.1
 " Licence:             MIT Licence
 " GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
@@ -12,7 +12,7 @@
 if exists('g:loaded_fuzzyfinder') || v:version < 701
   finish
 endif
-let g:loaded_fuzzyfinder = 022200 " Version xx.xx.xx
+let g:loaded_fuzzyfinder = 022201 " Version xx.xx.xx
 
 " }}}1
 "=============================================================================
@@ -307,12 +307,11 @@ endfunction
 "
 function! s:ExpandAbbrevMap(base, abbrev_map)
   let result = [a:base]
-  " expand
   for [pattern, sub_list] in items(a:abbrev_map)
     let exprs = result
     let result = []
     for expr in exprs
-      let result += map(copy(sub_list), 'substitute(expr, pattern, v:val, "g")')
+      let result += map(copy(sub_list), 'substitute(expr, pattern, escape(v:val, ''\''), "g")')
     endfor
   endfor
   return s:Unique(result)
@@ -376,7 +375,7 @@ endfunction
 "
 function! s:SetFormattedWordToAbbr(item, max_menu_width)
   let abbr_prefix = (exists('a:item.abbr_prefix') ? a:item.abbr_prefix : '')
-  let a:item.abbr = s:TruncateTail(printf('%3d: ', a:item.index) . abbr_prefix . a:item.word, a:max_menu_width)
+  let a:item.abbr = s:TruncateTail(printf('%4d: ', a:item.index) . abbr_prefix . a:item.word, a:max_menu_width)
   return a:item
 endfunction
 
@@ -385,7 +384,7 @@ function! s:MakeFileAbbrInfo(item, max_len_stats)
   let a:item.abbr = { 'head' : head,
         \             'tail' : a:item.word[strlen(head):],
         \             'key' : head . '.',
-        \             'prefix' : printf('%3d: ', a:item.index), }
+        \             'prefix' : printf('%4d: ', a:item.index), }
   if exists('a:item.abbr_prefix')
     let a:item.abbr.prefix .= a:item.abbr_prefix
   endif
@@ -682,11 +681,6 @@ function! g:FuzzyFinderMode.Base.on_mode_leave_post(opened)
 endfunction
 
 "
-function! g:FuzzyFinderMode.Base.on_open(expr, mode)
-  call s:OpenFile(a:expr, a:mode, self.reuse_window)
-endfunction
-
-"
 function! g:FuzzyFinderMode.Base.on_switch_mode(next_prev)
   let s:reserved_switch_mode = a:next_prev
   call feedkeys("\<Esc>", 'n') " stopinsert behavior is strange...
@@ -909,6 +903,11 @@ function! g:FuzzyFinderMode.File.on_complete(base)
 endfunction
 
 "
+function! g:FuzzyFinderMode.File.on_open(expr, mode)
+  call s:OpenFile(a:expr, a:mode, self.reuse_window)
+endfunction
+
+"
 function! g:FuzzyFinderMode.File.cached_glob(dir, file, excluded, index, limit)
   let key = fnamemodify(a:dir, ':p')
   call extend(self, { 'cache' : {} }, 'keep')
@@ -968,6 +967,11 @@ function! g:FuzzyFinderMode.MruFile.on_complete(base)
   let stats = self.get_filtered_stats(a:base)
   let result = s:FilterMatching(self.items, 'word', patterns.re, s:SuffixNumber(patterns.base), self.enumerating_limit)
   return map(result, 's:SetRanks(v:val, s:SplitPath(matchstr(v:val.word, ''^.*[^/\\]'')).tail, base_tail, stats)')
+endfunction
+
+"
+function! g:FuzzyFinderMode.MruFile.on_open(expr, mode)
+  call s:OpenFile(a:expr, a:mode, self.reuse_window)
 endfunction
 
 "
@@ -1176,6 +1180,11 @@ function! g:FuzzyFinderMode.TaggedFile.on_complete(base)
 endfunction
 
 "
+function! g:FuzzyFinderMode.TaggedFile.on_open(expr, mode)
+  call s:OpenFile(a:expr, a:mode, self.reuse_window)
+endfunction
+
+"
 function! g:FuzzyFinderMode.TaggedFile.on_mode_enter_pre()
   let self.tag_files = s:GetCurrentTagFiles()
 endfunction
@@ -1206,6 +1215,7 @@ let g:FuzzyFinderMode.GivenFile = copy(g:FuzzyFinderMode.Base)
 "
 function! g:FuzzyFinderMode.GivenFile.launch(initial_pattern, partial_matching, items)
   let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call map(self.items, 's:SetFormattedWordToAbbr(v:val, self.max_menu_width)')
   call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
 
@@ -1234,6 +1244,7 @@ let g:FuzzyFinderMode.GivenDir = copy(g:FuzzyFinderMode.Base)
 "
 function! g:FuzzyFinderMode.GivenDir.launch(initial_pattern, partial_matching, items)
   let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call map(self.items, 's:SetFormattedWordToAbbr(v:val, self.max_menu_width)')
   call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
 
@@ -1261,6 +1272,7 @@ let g:FuzzyFinderMode.GivenCmd = copy(g:FuzzyFinderMode.Base)
 "
 function! g:FuzzyFinderMode.GivenCmd.launch(initial_pattern, partial_matching, items)
   let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call map(self.items, 's:SetFormattedWordToAbbr(v:val, self.max_menu_width)')
   call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
 
@@ -1346,6 +1358,7 @@ let g:FuzzyFinderMode.CallbackItem = copy(g:FuzzyFinderMode.Base)
 function! g:FuzzyFinderMode.CallbackItem.launch(initial_pattern, partial_matching, listener, items, for_file)
   let self.listener = a:listener
   let self.items = s:MapToSetSerialIndex(map(copy(a:items), '{ "word" : v:val }'), 1)
+  call map(self.items, 's:SetFormattedWordToAbbr(v:val, self.max_menu_width)')
   let self.on_complete = (a:for_file ? self.on_complete_file : self.on_complete_nonfile)
   call.self.launch_base(a:initial_pattern, a:partial_matching)
 endfunction
