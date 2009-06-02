@@ -989,6 +989,12 @@ SPECIAL THANKS                                            *fuzzyfinder-thanks*
 ==============================================================================
 CHANGELOG                                              *fuzzyfinder-changelog*
 
+2.22.2:
+  - Changed to consider a length of a date/time string when abbreviates long
+    completion items.
+  - Fixed a bug that '**/' pattern did not search for files directly under the
+    current working directory in File mode. Thanks to Martin for reporting.
+
 2.22.1:
   - Fixed a bug that Fuzzyfinder could not expand abbreviations to patterns
     including '\' correctly.

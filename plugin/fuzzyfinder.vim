@@ -1,7 +1,7 @@
 "=============================================================================
 " File:                plugin/fuzzyfinder.vim
 " Author:              Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version:             2.22.1, for Vim 7.1
+" Version:             2.22.2, for Vim 7.1
 " Licence:             MIT Licence
 " GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
@@ -12,7 +12,7 @@
 if exists('g:loaded_fuzzyfinder') || v:version < 701
   finish
 endif
-let g:loaded_fuzzyfinder = 022201 " Version xx.xx.xx
+let g:loaded_fuzzyfinder = 022202 " Version xx.xx.xx
 
 " }}}1
 "=============================================================================
@@ -101,7 +101,7 @@ function! s:TruncateTail(str, len)
   elseif a:len <= len(s:ABBR_TRUNCATION_MARK)
     return s:ABBR_TRUNCATION_MARK
   endif
-  return a:str[:a:len - 1 + len(s:ABBR_TRUNCATION_MARK)] . s:ABBR_TRUNCATION_MARK
+  return a:str[:a:len - 1 - len(s:ABBR_TRUNCATION_MARK)] . s:ABBR_TRUNCATION_MARK
 endfunction
 
 " truncates a:str and add a:mark if a length of a:str is more than a:len
@@ -113,7 +113,9 @@ function! s:TruncateMid(str, len)
   endif
   let len_head = (a:len - len(s:ABBR_TRUNCATION_MARK)) / 2
   let len_tail = a:len - len(s:ABBR_TRUNCATION_MARK) - len_head
-  return a:str[: len_head - 1] . s:ABBR_TRUNCATION_MARK . a:str[-len_tail :]
+  return  (len_head > 0 ? a:str[: len_head - 1] : '') .
+        \ s:ABBR_TRUNCATION_MARK .
+        \ (len_tail > 0 ? a:str[-len_tail :] : '')
 endfunction
 
 " takes suffix numer. if no digits, returns -1
@@ -321,9 +323,9 @@ endfunction
 function! s:EnumExpandedDirsEntries(dir, excluded)
   " Substitutes "\" because on Windows, "**\" doesn't include ".\",
   " but "**/" include "./". I don't know why.
-  let dirs = split(expand(substitute(a:dir, '\', '/', 'g')), "\n")
-  let entries = s:Concat(map(copy(dirs), 'split(glob(v:val . ".*"), "\n") + ' .
-        \                                'split(glob(v:val . "*" ), "\n")'))
+  let dirNormalized = substitute(a:dir, '\', '/', 'g')
+  let entries = split(glob(dirNormalized . "*" ), "\n") +
+        \       split(glob(dirNormalized . ".*"), "\n")
   " removes "*/." and "*/.."
   call filter(entries, 'v:val !~ ''\v(^|[/\\])\.\.?$''')
   call map(entries, 'extend(s:SplitPath(v:val), { "suffix" : (isdirectory(v:val) ? s:PATH_SEPARATOR : "") })')
@@ -368,17 +370,21 @@ function! s:SetRanks(item, eval_word, eval_base, stats)
     let rank_perfect = 2
     let rank_matching = -s:EvaluateMatchingRate(a:eval_word, a:eval_base)
   endif
-  let a:item.ranks = [ rank_perfect, s:EvaluateLearningRank(a:item.word, a:stats), rank_matching, a:item.index ]
+  let a:item.ranks = [ rank_perfect, s:EvaluateLearningRank(a:item.word, a:stats),
+        \              rank_matching, a:item.index ]
   return a:item
 endfunction
 
 "
-function! s:SetFormattedWordToAbbr(item, max_menu_width)
+function! s:SetFormattedWordToAbbr(item, max_item_width)
+  let len_menu = (exists('a:item.menu') ? len(a:item.menu) + 2 : 0)
   let abbr_prefix = (exists('a:item.abbr_prefix') ? a:item.abbr_prefix : '')
-  let a:item.abbr = s:TruncateTail(printf('%4d: ', a:item.index) . abbr_prefix . a:item.word, a:max_menu_width)
+  let a:item.abbr = printf('%4d: ', a:item.index) . abbr_prefix . a:item.word
+  let a:item.abbr = s:TruncateTail(a:item.abbr, a:max_item_width - len_menu)
   return a:item
 endfunction
 
+"
 function! s:MakeFileAbbrInfo(item, max_len_stats)
   let head = matchstr(a:item.word, '^.*[/\\]\ze.')
   let a:item.abbr = { 'head' : head,
@@ -388,32 +394,35 @@ function! s:MakeFileAbbrInfo(item, max_len_stats)
   if exists('a:item.abbr_prefix')
     let a:item.abbr.prefix .= a:item.abbr_prefix
   endif
-  let a:item.abbr.len = len(a:item.abbr.prefix) + len(a:item.word)
-  if !exists('a:max_len_stats[a:item.abbr.key]') || a:item.abbr.len > a:max_len_stats[a:item.abbr.key]
-    let a:max_len_stats[a:item.abbr.key] = a:item.abbr.len
+  let len = len(a:item.abbr.prefix) + len(a:item.word) +
+        \   (exists('a:item.menu') ? len(a:item.menu) + 2 : 0)
+  if !exists('a:max_len_stats[a:item.abbr.key]') || len > a:max_len_stats[a:item.abbr.key]
+    let a:max_len_stats[a:item.abbr.key] = len
   endif
   return a:item
 endfunction
 
 
 "
-function! s:GetTruncatedHeads(head, max_len, max_menu_width)
-  return s:TruncateMid(a:head, len(a:head) + a:max_menu_width - a:max_len)
+function! s:GetTruncatedHead(head, max_len, max_item_width)
+  return s:TruncateMid(a:head, len(a:head) + a:max_item_width - a:max_len)
 endfunction
 
 "
-function! s:SetAbbrWithFileAbbrData(item, truncated_heads, max_menu_width)
+function! s:SetAbbrWithFileAbbrData(item, truncated_heads, max_item_width)
+  let len_menu = (exists('a:item.menu') ? len(a:item.menu) + 2 : 0)
   let abbr = a:item.abbr.prefix . a:truncated_heads[a:item.abbr.key] . a:item.abbr.tail
-  let a:item.abbr = s:TruncateTail(abbr, a:max_menu_width)
+  let a:item.abbr = s:TruncateTail(abbr, a:max_item_width - len_menu)
   return a:item
 endfunction
 
 "
-function! s:MapToSetAbbrWithFileWord(items, max_menu_width)
+function! s:MapToSetAbbrWithFileWord(items, max_item_width)
   let max_len_stats = {}
   call map(a:items, 's:MakeFileAbbrInfo(v:val, max_len_stats)')
-  let truncated_heads = map(max_len_stats, 's:GetTruncatedHeads(v:key[: -2], v:val, a:max_menu_width)')
-  return map(a:items, 's:SetAbbrWithFileAbbrData(v:val, truncated_heads, a:max_menu_width)')
+  let truncated_heads =
+        \ map(max_len_stats, 's:GetTruncatedHead(v:key[: -2], v:val, a:max_item_width)')
+  return map(a:items, 's:SetAbbrWithFileAbbrData(v:val, truncated_heads, a:max_item_width)')
 endfunction
 
 "
@@ -488,9 +497,12 @@ endfunction
 
 "
 function! s:OpenBuffer(buf_nr, mode, reuse)
-  if a:reuse && ((a:mode == s:OPEN_MODE_SPLIT  && s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
-        \        (a:mode == s:OPEN_MODE_VSPLIT && s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
-        \        (a:mode == s:OPEN_MODE_TAB    && s:MoveToWindowOfBufferInOtherTabPage  (a:buf_nr)))
+  if a:reuse && ((a:mode == s:OPEN_MODE_SPLIT &&
+        \         s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
+        \        (a:mode == s:OPEN_MODE_VSPLIT &&
+        \         s:MoveToWindowOfBufferInCurrentTabPage(a:buf_nr)) ||
+        \        (a:mode == s:OPEN_MODE_TAB &&
+        \         s:MoveToWindowOfBufferInOtherTabPage(a:buf_nr)))
     return
   endif
   execute printf({
@@ -847,7 +859,8 @@ endfunction
 
 "
 function! g:FuzzyFinderMode.Buffer.on_mode_enter_post()
-  let self.items = map(filter(range(1, bufnr('$')), 'buflisted(v:val) && v:val != self.prev_bufnr'),
+  let self.items = map(filter(range(1, bufnr('$')),
+        \                     'buflisted(v:val) && v:val != self.prev_bufnr'),
         \              'self.make_item(v:val)')
   if self.mru_order
     call s:MapToSetSerialIndex(sort(self.items, 's:CompareTimeDescending'), 1)
@@ -1565,23 +1578,23 @@ let g:FuzzyFinderOptions = { 'Base':{}, 'Buffer':{}, 'File':{}, 'Dir':{},
       \                      'GivenFile':{}, 'GivenDir':{}, 'GivenCmd':{},
       \                      'CallbackFile':{}, 'CallbackItem':{}, }
 "-----------------------------------------------------------------------------
-let g:FuzzyFinderOptions.Base.key_open          = '<CR>'
-let g:FuzzyFinderOptions.Base.key_open_split    = '<C-j>'
-let g:FuzzyFinderOptions.Base.key_open_vsplit   = '<C-k>'
-let g:FuzzyFinderOptions.Base.key_open_tab      = '<C-l>'
-let g:FuzzyFinderOptions.Base.key_next_mode     = '<C-t>'
-let g:FuzzyFinderOptions.Base.key_prev_mode     = '<C-y>'
-let g:FuzzyFinderOptions.Base.key_ignore_case   = '<C-g><C-g>'
-let g:FuzzyFinderOptions.Base.info_file         = '~/.vimfuzzyfinder'
-let g:FuzzyFinderOptions.Base.min_length        = 0
-let g:FuzzyFinderOptions.Base.abbrev_map        = {}
-let g:FuzzyFinderOptions.Base.ignore_case       = 1
-let g:FuzzyFinderOptions.Base.time_format       = '(%x %H:%M:%S)'
-let g:FuzzyFinderOptions.Base.learning_limit    = 100
-let g:FuzzyFinderOptions.Base.enumerating_limit = 100
-let g:FuzzyFinderOptions.Base.max_menu_width    = 80
-let g:FuzzyFinderOptions.Base.lasting_cache     = 1
-let g:FuzzyFinderOptions.Base.migemo_support    = 0
+let g:FuzzyFinderOptions.Base.key_open           = '<CR>'
+let g:FuzzyFinderOptions.Base.key_open_split     = '<C-j>'
+let g:FuzzyFinderOptions.Base.key_open_vsplit    = '<C-k>'
+let g:FuzzyFinderOptions.Base.key_open_tab       = '<C-l>'
+let g:FuzzyFinderOptions.Base.key_next_mode      = '<C-t>'
+let g:FuzzyFinderOptions.Base.key_prev_mode      = '<C-y>'
+let g:FuzzyFinderOptions.Base.key_ignore_case    = '<C-g><C-g>'
+let g:FuzzyFinderOptions.Base.info_file          = '~/.vimfuzzyfinder'
+let g:FuzzyFinderOptions.Base.min_length         = 0
+let g:FuzzyFinderOptions.Base.abbrev_map         = {}
+let g:FuzzyFinderOptions.Base.ignore_case        = 1
+let g:FuzzyFinderOptions.Base.time_format        = '(%Y-%m-%d %H:%M:%S)'
+let g:FuzzyFinderOptions.Base.learning_limit     = 100
+let g:FuzzyFinderOptions.Base.enumerating_limit  = 100
+let g:FuzzyFinderOptions.Base.max_menu_width     = 80
+let g:FuzzyFinderOptions.Base.lasting_cache      = 1
+let g:FuzzyFinderOptions.Base.migemo_support     = 0
 "-----------------------------------------------------------------------------
 let g:FuzzyFinderOptions.Buffer.mode_available   = 1
 let g:FuzzyFinderOptions.Buffer.prompt           = '>Buffer>'
