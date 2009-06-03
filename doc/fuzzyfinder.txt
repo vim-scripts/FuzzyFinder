@@ -989,6 +989,10 @@ SPECIAL THANKS                                            *fuzzyfinder-thanks*
 ==============================================================================
 CHANGELOG                                              *fuzzyfinder-changelog*
 
+2.22.3:
+  - Fixed a bug that Fuzzyfinder could not open files with '$' in the name on
+    Windows.
+
 2.22.2:
   - Changed to consider a length of a date/time string when abbreviates long
     completion items.

@@ -1,7 +1,7 @@
 "=============================================================================
 " File:                plugin/fuzzyfinder.vim
 " Author:              Takeshi NISHIDA <ns9tks@DELETE-ME.gmail.com>
-" Version:             2.22.2, for Vim 7.1
+" Version:             2.22.3, for Vim 7.1
 " Licence:             MIT Licence
 " GetLatestVimScripts: 1984 1 :AutoInstall: fuzzyfinder.vim
 "
@@ -12,7 +12,7 @@
 if exists('g:loaded_fuzzyfinder') || v:version < 701
   finish
 endif
-let g:loaded_fuzzyfinder = 022202 " Version xx.xx.xx
+let g:loaded_fuzzyfinder = 022203 " Version xx.xx.xx
 
 " }}}1
 "=============================================================================
@@ -144,7 +144,8 @@ endfunction
 
 "
 function! s:EscapeFilename(fn)
-  return escape(a:fn, " \t\n*?[{`$%#'\"|!<")
+  " NOTE: '$' must not be escaped on Windows.
+  return escape(a:fn, " \t\n*?[{`%#'\"|!<")
 endfunction
 
 " "foo/.../bar/...hoge" -> "foo/.../bar/../../hoge"
