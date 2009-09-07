@@ -104,6 +104,9 @@ FuzzyFinder は入力されたパターンにマッチするアイテムを検�
 
 補完メニューの最初のアイテムは自動的に選択状態になります。
 
+<C-t> (|g:fuf_keyPrevPattern|) と <C-^> (|g:fuf_keyNextPattern|) で、履歴から
+過去に入力したパターンを呼び出すことができます。
+
 いろいろな方法で、選択されたアイテムを開くことができます:
 
         <CR>  (|g:fuf_keyOpen|)        - 直前のウィンドウで開きます。
@@ -280,11 +283,11 @@ API 関数:
 >
         let listener = {}
 
-        function! listener.onComplete(item, method)
+        function listener.onComplete(item, method)
           echo "Item: " . a:item . "\nMethod: " . a:method
         endfunction
 
-        function! listener.onAbort()
+        function listener.onAbort()
           echo "Abort"
         endfunction
 
@@ -321,11 +324,11 @@ API 関数:
 >
         let listener = {}
 
-        function! listener.onComplete(item, method)
+        function listener.onComplete(item, method)
           echo "Item: " . a:item . "\nMethod: " . a:method
         endfunction
 
-        function! listener.onAbort()
+        function listener.onAbort()
           echo "Abort"
         endfunction
 
@@ -360,7 +363,7 @@ API 関数:
 チングはパスの末尾の部分だけに対して行われます。絞り込みパターンはパス全体に対
 して行われます。
 
-                                                *fuf-sort-of-completion-items*
+                                             *fuf-sorting-of-completion-items*
 補完アイテムのソート ~
 
 FuzzyFinder は幾つかのルールに従って補完アイテムをソートします。
@@ -605,6 +608,16 @@ See also: |fuf-vimrc-sample|
   let g:fuf_keyOpenTabpage = '<C-l>'
 <
         補完を確定し、バッファ/ファイルを別タブページ開くキー。
+
+                                                     *g:fuf_keyPrevPattern*  >
+  let g:fuf_keyPrevPattern = '<C-t>'
+<
+        履歴から前の入力パターンを呼び出すキー。
+
+                                                     *g:fuf_keyNextPattern*  >
+  let g:fuf_keyNextPattern = '<C-^>'
+<
+        履歴から次の入力パターンを呼び出すキー。
 
                                                            *g:fuf_infoFile*  >
   let g:fuf_infoFile = '~/.vim-fuf'
