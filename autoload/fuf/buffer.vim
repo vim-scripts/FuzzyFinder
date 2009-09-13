@@ -19,6 +19,11 @@ function fuf#buffer#createHandler(base)
 endfunction
 
 "
+function fuf#buffer#getSwitchOrder()
+  return g:fuf_buffer_switchOrder
+endfunction
+
+"
 function fuf#buffer#renewCache()
 endfunction
 
@@ -62,7 +67,7 @@ function s:makeItem(nr)
 endfunction
 
 "
-function! s:getBufIndicator(bufNr)
+function s:getBufIndicator(bufNr)
   if !getbufvar(a:bufNr, '&modifiable')
     return '[-]'
   elseif getbufvar(a:bufNr, '&modified')
@@ -75,7 +80,7 @@ function! s:getBufIndicator(bufNr)
 endfunction
 
 "
-function! s:compareTimeDescending(i1, i2)
+function s:compareTimeDescending(i1, i2)
   return a:i1.time == a:i2.time ? 0 : a:i1.time > a:i2.time ? -1 : +1
 endfunction
 
@@ -93,11 +98,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_buffer_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_buffer_promptHighlight
 endfunction
 
 "

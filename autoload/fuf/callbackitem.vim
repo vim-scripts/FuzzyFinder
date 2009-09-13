@@ -19,6 +19,11 @@ function fuf#callbackitem#createHandler(base)
 endfunction
 
 "
+function fuf#callbackitem#getSwitchOrder()
+  return -1
+endfunction
+
+"
 function fuf#callbackitem#renewCache()
 endfunction
 
@@ -32,7 +37,8 @@ function fuf#callbackitem#onInit()
 endfunction
 
 "
-function fuf#callbackitem#launch(initialPattern, partialMatching, listener, items, forPath)
+function fuf#callbackitem#launch(initialPattern, partialMatching, prompt, listener, items, forPath)
+  let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
   let s:listener = a:listener
   let s:forPath = a:forPath
   if s:forPath
@@ -67,12 +73,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_callbackitem_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_callbackitem_promptHighlight
+  return s:prompt
 endfunction
 
 "

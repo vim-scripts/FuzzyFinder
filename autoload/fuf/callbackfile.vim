@@ -19,6 +19,11 @@ function fuf#callbackfile#createHandler(base)
 endfunction
 
 "
+function fuf#callbackfile#getSwitchOrder()
+  return -1
+endfunction
+
+"
 function fuf#callbackfile#renewCache()
   let s:cache = {}
 endfunction
@@ -33,7 +38,9 @@ function fuf#callbackfile#onInit()
 endfunction
 
 "
-function fuf#callbackfile#launch(initialPattern, partialMatching, listener)
+function fuf#callbackfile#launch(initialPattern, partialMatching, prompt, exclude, listener)
+  let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
+  let s:exclude = a:exclude
   let s:listener = a:listener
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
 endfunction
@@ -48,7 +55,7 @@ let s:MODE_NAME = expand('<sfile>:t:r')
 function s:enumItems(dir)
   let key = getcwd() . "\n" . a:dir
   if !exists('s:cache[key]')
-    let s:cache[key] = fuf#enumExpandedDirsEntries(a:dir, g:fuf_callbackfile_exclude)
+    let s:cache[key] = fuf#enumExpandedDirsEntries(a:dir, s:exclude)
     if isdirectory(a:dir)
       call insert(s:cache[key], fuf#makePathItem(a:dir . '.', 0))
     endif
@@ -71,12 +78,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_callbackfile_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_callbackfile_promptHighlight
+  return s:prompt
 endfunction
 
 "

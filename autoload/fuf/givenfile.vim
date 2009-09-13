@@ -19,6 +19,11 @@ function fuf#givenfile#createHandler(base)
 endfunction
 
 "
+function fuf#givenfile#getSwitchOrder()
+  return -1
+endfunction
+
+"
 function fuf#givenfile#renewCache()
 endfunction
 
@@ -32,8 +37,9 @@ function fuf#givenfile#onInit()
 endfunction
 
 "
-function fuf#givenfile#launch(initialPattern, partialMatching, items)
-  let s:items = map(copy(a:items), 'fuf#makePathItem(v:val, 1)')
+function fuf#givenfile#launch(initialPattern, partialMatching, prompt, items)
+  let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
+  let s:items = map(copy(a:items), 'fuf#makePathItem(v:val, 0)')
   call fuf#mapToSetSerialIndex(s:items, 1)
   call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
@@ -59,12 +65,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_givenfile_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_givenfile_promptHighlight
+  return s:prompt
 endfunction
 
 "

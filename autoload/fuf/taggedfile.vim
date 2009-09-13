@@ -19,6 +19,11 @@ function fuf#taggedfile#createHandler(base)
 endfunction
 
 "
+function fuf#taggedfile#getSwitchOrder()
+  return g:fuf_taggedfile_switchOrder
+endfunction
+
+"
 function fuf#taggedfile#renewCache()
   let s:cache = {}
 endfunction
@@ -80,11 +85,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_taggedfile_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_taggedfile_promptHighlight
 endfunction
 
 "

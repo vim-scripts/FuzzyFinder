@@ -19,6 +19,11 @@ function fuf#mrufile#createHandler(base)
 endfunction
 
 "
+function fuf#mrufile#getSwitchOrder()
+  return g:fuf_mrufile_switchOrder
+endfunction
+
+"
 function fuf#mrufile#renewCache()
   let s:cache = {}
 endfunction
@@ -46,7 +51,7 @@ let s:MODE_NAME = expand('<sfile>:t:r')
 
 "
 function s:updateInfo()
-  if !empty(&buftype) || expand('%') !~ '\S'
+  if !empty(&buftype) || !filereadable(expand('%'))
     return
   endif
   let info = fuf#loadInfoFile(s:MODE_NAME)
@@ -97,11 +102,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_mrufile_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_mrufile_promptHighlight
 endfunction
 
 "

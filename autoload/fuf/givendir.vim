@@ -19,6 +19,11 @@ function fuf#givendir#createHandler(base)
 endfunction
 
 "
+function fuf#givendir#getSwitchOrder()
+  return -1
+endfunction
+
+"
 function fuf#givendir#renewCache()
 endfunction
 
@@ -32,7 +37,8 @@ function fuf#givendir#onInit()
 endfunction
 
 "
-function fuf#givendir#launch(initialPattern, partialMatching, items)
+function fuf#givendir#launch(initialPattern, partialMatching, prompt, items)
+  let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
   let s:items = map(copy(a:items), 'substitute(v:val, ''[/\\]\?$'', "", "")')
   let s:items = map(s:items, 'fuf#makePathItem(v:val, 0)')
   call fuf#mapToSetSerialIndex(s:items, 1)
@@ -59,12 +65,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_givendir_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_givendir_promptHighlight
+  return s:prompt
 endfunction
 
 "

@@ -316,6 +316,7 @@ function fuf#launch(modeName, initialPattern, partialMatching)
   endif
   let s:runningHandler = fuf#{a:modeName}#createHandler(copy(s:handlerBase))
   let s:runningHandler.info = fuf#loadInfoFile(s:runningHandler.getModeName())
+  let s:runningHandler.partialMatching = a:partialMatching
   let s:runningHandler.makeRegexpPattern = function(a:partialMatching
         \                                           ? 's:makePartialRegexpPattern'
         \                                           : 's:makeFuzzyRegexpPattern')
@@ -339,12 +340,14 @@ function fuf#launch(modeName, initialPattern, partialMatching)
         \   [ g:fuf_keyOpenTabpage, 'onCr(' . s:OPEN_MODE_TAB     . ', 0)' ],
         \   [ '<BS>'              , 'onBs()'                               ],
         \   [ '<C-h>'             , 'onBs()'                               ],
+        \   [ g:fuf_keyNextMode   , 'onSwitchMode(+1)'                     ],
+        \   [ g:fuf_keyPrevMode   , 'onSwitchMode(-1)'                     ],
         \   [ g:fuf_keyPrevPattern, 'onRecallPattern(+1)'                  ],
         \   [ g:fuf_keyNextPattern, 'onRecallPattern(-1)'                  ],
         \ ]
     " hacks to be able to use feedkeys().
     execute printf('inoremap <buffer> <silent> %s <C-r>=%s%s ? "" : ""<CR>',
-          \        lhs, s:getSidPrefix(), rhs)
+          \        lhs, s:PREFIX_SID, rhs)
   endfor
   " Starts Insert mode and makes CursorMovedI event now. Command prompt is
   " needed to forces a completion menu to update every typing.
@@ -411,6 +414,18 @@ endfunction
 
 " }}}1
 "=============================================================================
+" SID PREFIX {{{1
+
+function s:getSidPrefix()
+  return matchstr(expand('<sfile>'), '<SNR>\d\+_')
+endfunction
+
+let s:PREFIX_SID = s:getSidPrefix()
+
+delfunction s:getSidPrefix
+
+" }}}1
+"=============================================================================
 " LOCAL FUNCTIONS/VARIABLES {{{1
 
 let s:INFO_FILE_VERSION_LINE = "VERSION\t300"
@@ -420,11 +435,6 @@ let s:OPEN_MODE_CURRENT = 1
 let s:OPEN_MODE_SPLIT   = 2
 let s:OPEN_MODE_VSPLIT  = 3
 let s:OPEN_MODE_TAB     = 4
-
-"
-function s:getSidPrefix()
-  return matchstr(expand('<sfile>'), '<SNR>\d\+_')
-endfunction
 
 " wildcard -> regexp
 function s:convertWildcardToRegexp(expr)
@@ -489,7 +499,7 @@ function s:setRanks(item, key, patternPartial, patternFuzzy, boundaryMatching, s
         \   (a:boundaryMatching
         \    ? -s:scoreBoundaryMatching(a:item.boundaries, 
         \                               a:patternPartial, a:patternFuzzy)
-        \    : 1.0),
+        \    : 0.0),
         \   -s:scoreSequentialMatching(a:item[a:key],
         \                              a:patternPartial),
         \   a:item.index,
@@ -509,12 +519,12 @@ endfunction
 
 " range of return value is [0.0, 1.0]
 function s:scoreSequentialMatching(word, patternPartial)
-  let pos = match(a:word, a:patternPartial)
-  if pos < 0
-    return 0
+  let posEnd = matchend(a:word, a:patternPartial)
+  if posEnd <= 0
+    return 0.0
   endif
-  return 0.5 * (len(a:word) - matchend(a:word, a:patternPartial)) / len(a:word) +
-        \ (pos == 0 ? 0.5 : 0.0)
+  let posBegin = match(a:word, a:patternPartial)
+  return (posBegin == 0 ? 0.5 : 0.0) + 0.5 / (len(a:word) - posEnd + 1)
 endfunction
 
 " range of return value is [0.0, 1.0]
@@ -526,9 +536,9 @@ function s:scoreBoundaryMatching(word, patternPartial, patternFuzzy)
 endfunction
 
 "
-function s:highlightPrompt(prompt, highlight)
+function s:highlightPrompt(prompt)
   syntax clear
-  execute printf('syntax match %s /^\V%s/', a:highlight, escape(a:prompt, '\'))
+  execute printf('syntax match %s /^\V%s/', g:fuf_promptHighlight, escape(a:prompt, '\'))
 endfunction
 
 "
@@ -649,12 +659,20 @@ function s:activateFufBuffer()
   execute ':lcd ' . escape(cwd, ' ')
   call s:setLocalOptionsForFufBuffer()
   redraw " for 'lazyredraw'
-  if exists(':AutoComplPopLock') | execute ':AutoComplPopLock' | endif
+  if exists(':AcpLock')
+    AcpLock
+  elseif exists(':AutoComplPopLock')
+    AutoComplPopLock
+  endif
 endfunction
 
 "
 function s:deactivateFufBuffer()
-  if exists(':AutoComplPopUnlock') | execute ':AutoComplPopUnlock' | endif
+  if exists(':AcpUnlock')
+    AcpUnlock
+  elseif exists(':AutoComplPopUnlock')
+    AutoComplPopUnlock
+  endif
   " must close after returning to previous window
   wincmd p
   execute s:bufNrFuf . 'bdelete'
@@ -736,6 +754,11 @@ function s:onBs()
 endfunction
 
 "
+function s:onSwitchMode(shift)
+  call s:runningHandler.onSwitchMode(a:shift)
+endfunction
+
+"
 function s:onRecallPattern(shift)
   call s:runningHandler.onRecallPattern(a:shift)
 endfunction
@@ -754,9 +777,6 @@ let s:handlerBase = {}
 " 
 " "
 " s:handler.getPrompt()
-" 
-" "
-" s:handler.getPromptHighlight()
 " 
 " " returns true if the mode deals with file paths.
 " s:handler.targetsPath()
@@ -800,7 +820,7 @@ function s:handlerBase.complete(findstart, base)
   elseif  !self.existsPrompt(a:base)
     return []
   endif
-  call s:highlightPrompt(self.getPrompt(), self.getPromptHighlight())
+  call s:highlightPrompt(self.getPrompt())
   let result = []
   for patternBase in s:expandAbbrevMap(self.removePrompt(a:base), g:fuf_abbrevMap)
     let patternSet = s:makePatternSet(patternBase, self.targetsPath(), self.makeRegexpPattern)
@@ -864,23 +884,28 @@ endfunction
 "
 function s:handlerBase.onInsertLeave()
   let lastPattern = self.removePrompt(getline('.'))
+  let lastPartialMatching = s:runningHandler.partialMatching
   call s:restoreTemporaryGlobalOptions()
   call s:deactivateFufBuffer()
-  let reserved = exists('s:reservedCommand')
-  if reserved
+  call fuf#saveInfoFile(s:runningHandler.getModeName(), s:runningHandler.info)
+  let fOpen = exists('s:reservedCommand')
+  if fOpen
     call self.onOpen(s:reservedCommand[0], s:reservedCommand[1])
     unlet s:reservedCommand
   endif
-  call self.onModeLeavePost(reserved)
-  call fuf#saveInfoFile(s:runningHandler.getModeName(), s:runningHandler.info)
+  call self.onModeLeavePost(fOpen)
   unlet s:runningHandler
+  if exists('s:reservedMode')
+    call fuf#launch(s:reservedMode, lastPattern, lastPartialMatching)
+    unlet s:reservedMode
+  endif
 endfunction
 
 "
 function s:handlerBase.onCr(typeOpen, fCheckDir)
   if pumvisible()
     call feedkeys(printf("\<C-y>\<C-r>=%sonCr(%d, 1) ? '' : ''\<CR>",
-          \       s:getSidPrefix(), a:typeOpen), 'n')
+          \       s:PREFIX_SID, a:typeOpen), 'n')
     return
   endif
   if !empty(self.lastPattern)
@@ -909,6 +934,22 @@ function s:handlerBase.onBs()
     let numBs = 1
   endif
   call feedkeys((pumvisible() ? "\<C-e>" : "") . repeat("\<BS>", numBs), 'n')
+endfunction
+
+"
+function s:handlerBase.onSwitchMode(shift)
+  let modes = copy(g:fuf_modes)
+  call map(modes, '{ "ranks": [ fuf#{v:val}#getSwitchOrder(), v:val ] }')
+  call filter(modes, 'v:val.ranks[0] >= 0')
+  call sort(modes, 'fuf#compareRanks')
+  let s:reservedMode = self.getModeName()
+  for i in range(len(modes))
+    if modes[i].ranks[1] == self.getModeName()
+      let s:reservedMode = modes[(i + a:shift) % len(modes)].ranks[1]
+      break
+    endif
+  endfor
+  call feedkeys("\<Esc>", 'n') " stopinsert doesn't work.
 endfunction
 
 "

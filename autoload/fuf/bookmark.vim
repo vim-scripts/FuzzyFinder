@@ -19,6 +19,11 @@ function fuf#bookmark#createHandler(base)
 endfunction
 
 "
+function fuf#bookmark#getSwitchOrder()
+  return g:fuf_bookmark_switchOrder
+endfunction
+
+"
 function fuf#bookmark#renewCache()
 endfunction
 
@@ -41,7 +46,7 @@ endfunction
 let s:MODE_NAME = expand('<sfile>:t:r')
 
 "
-function! s:getSelectedText()
+function s:getSelectedText()
   let regUN = [@", getregtype('"')]
   let reg0  = [@0, getregtype('0')]
   if mode() =~# "[vV\<C-v>]"
@@ -59,7 +64,7 @@ endfunction
 
 " opens a:path and jumps to the line matching to a:pattern from a:lnum within
 " a:range. if not found, jumps to a:lnum.
-function! s:jumpToBookmark(path, mode, pattern, lnum)
+function s:jumpToBookmark(path, mode, pattern, lnum)
   call fuf#openFile(a:path, a:mode, g:fuf_reuseWindow)
   let ln = a:lnum
   for i in range(0, g:fuf_bookmark_searchRange)
@@ -76,7 +81,7 @@ function! s:jumpToBookmark(path, mode, pattern, lnum)
 endfunction
 
 "
-function! s:getLinePattern(lnum)
+function s:getLinePattern(lnum)
   return '\C\V\^' . escape(getline(a:lnum), '\') . '\$'
 endfunction
 
@@ -118,11 +123,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_bookmark_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_bookmark_promptHighlight
 endfunction
 
 "

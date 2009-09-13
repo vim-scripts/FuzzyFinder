@@ -19,6 +19,11 @@ function fuf#file#createHandler(base)
 endfunction
 
 "
+function fuf#file#getSwitchOrder()
+  return g:fuf_file_switchOrder
+endfunction
+
+"
 function fuf#file#renewCache()
   let s:cache = {}
 endfunction
@@ -66,11 +71,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_file_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_file_promptHighlight
 endfunction
 
 "

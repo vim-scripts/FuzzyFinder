@@ -9,6 +9,7 @@ INSTALLATION                    |fuf-installation|
 USAGE                           |fuf-usage|
 MODES                           |fuf-modes|
 DETAILED TOPICS                 |fuf-detailed-topics|
+COMMANDS                        |fuf-commands|
 OPTIONS                         |fuf-options|
 VIMRC EXAMPLE                   |fuf-vimrc-sample|
 SPECIAL THANKS                  |fuf-thanks|
@@ -118,6 +119,9 @@ You can open a selected item in various ways:
 
 To cancel and return to previous window, just leave Insert mode.
 
+With <C-t> (|g:fuf_keyNextMode|) and <C-y> (|g:fuf_keyPrevMode|), You can
+switch current mode without leaving Insert mode .
+
 
 ==============================================================================
 MODES                                                              *fuf-modes*
@@ -201,18 +205,19 @@ This mode provides an API to open a selected file from a given list.
 API function:
 >
         function fuf#givenfile#launch(
-              \ initialPattern, partialMatching, items)
+              \ initialPattern, partialMatching, prompt, items)
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
         partialMatching - If non-zero, enable a partial matching instead of a
                           fuzzy matching.
+        prompt          - Prompt string
         items           - List of items.
 
 Example of use:
 >
         " Open one of your dotfiles.
-        call fuf#givenfile#launch('', 0, split(glob('~/.*'), "\n"))
+        call fuf#givenfile#launch('', 0, '>', split(glob('~/.*'), "\n"))
 <
 
                                                            *fuf-givendir-mode*
@@ -224,19 +229,20 @@ one from a given list.
 API function:
 >
         function fuf#givendir#launch(
-              \ initialPattern, partialMatching, items)
+              \ initialPattern, partialMatching, prompt, items)
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
         partialMatching - If non-zero, enable a partial matching instead of a
                           fuzzy matching.
+        prompt          - Prompt string
         items           - List of items.
 
 
 Example of use:
 >
         " Change current working directory to one of your runtime directory.
-        call fuf#givendir#launch('', 0, split(&runtimepath, ','))
+        call fuf#givendir#launch('', 0, '>', split(&runtimepath, ','))
 <
 
                                                            *fuf-givencmd-mode*
@@ -250,12 +256,13 @@ series of key input in Normal mode.
 API function:
 >
         function fuf#givencmd#launch(
-              \ initialPattern, partialMatching, items)
+              \ initialPattern, partialMatching, prompt, items)
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
         partialMatching - If non-zero, enable a partial matching instead of a
                           fuzzy matching.
+        prompt          - Prompt string
         items           - List of items.
 
 
@@ -270,7 +277,7 @@ Example of use:
         endfunction
 
         " execute one of the user-defined commands 
-        call fuf#givencmd#launch('', 0, GetAllCommands())
+        call fuf#givencmd#launch('', 0, '>', GetAllCommands())
 
 <
 
@@ -283,12 +290,15 @@ user.
 API function:
 >
         function fuf#callbackfile#launch(
-              \ initialPattern, partialMatching, listener)
+              \ initialPattern, partialMatching, prompt, exclude, listener)
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
         partialMatching - If non-zero, enable a partial matching instead of a
                           fuzzy matching.
+        prompt          - Prompt string.
+        exclude         - Regexp pattern for items which you want to exclude
+                          from completion list.
         listener        - |Dictionary| which has 'onComplete' and 'onAbort'.
                           They are called at the end of FuzzyFinder.
                           listener.onComplete(item, method) is called with 2
@@ -309,10 +319,10 @@ Example of use:
         endfunction
 
         " Find a file from current working directory.
-        call fuf#callbackfile#launch('', 0, listener)
+        call fuf#callbackfile#launch('', 0, '>', '', listener)
 
         " Find a file from home directory.
-        call fuf#callbackfile#launch('~/', 0, listener)
+        call fuf#callbackfile#launch('~/', 0, '>', '', listener)
 <
 
                                                        *fuf-callbackitem-mode*
@@ -324,12 +334,13 @@ by an user.
 API function:
 >
         function fuf#callbackitem#launch(
-              \ initialPattern, partialMatching, listener, items, forPath)
+              \ initialPattern, partialMatching, prompt, listener, items, forPath)
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialPatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable a partial matching instead of a
                           fuzzy matching.
+        prompt          - Prompt string
         listener        - |Dictionary| which has 'onComplete' and 'onAbort'.
                           They are called at the end of FuzzyFinder.
                           listener.onComplete(item, method) is called with 2
@@ -352,10 +363,10 @@ Example of use:
         endfunction
 
         " Select an item from a given list.
-        call fuf#callbackitem#launch('', 0, listener, ['ed', 'vi', 'vim'], 0)
+        call fuf#callbackitem#launch('', 0, '>', listener, ['ed', 'vi', 'vim'], 0)
 
         " Select a file from a given list.
-        call fuf#callbackitem#launch('', 0, listener, ['../foo/bar', 'baz'], 1)
+        call fuf#callbackitem#launch('', 0, '>', listener, ['../foo/bar', 'baz'], 1)
 <
 
 ==============================================================================
@@ -640,13 +651,23 @@ For All Modes ~
         Key mapped to select completion item or finish input and open a
         buffer/file in a new tab page.
 
+                                                        *g:fuf_keyNextMode*  >
+  let g:fuf_keyNextMode = '<C-t>'
+<
+        Key mapped to switch to next mode.
+
+                                                        *g:fuf_keyPrevMode*  >
+  let g:fuf_keyPrevMode = '<C-y>'
+<
+        Key mapped to switch to previous mode.
+
                                                      *g:fuf_keyPrevPattern*  >
-  let g:fuf_keyPrevPattern = '<C-t>'
+  let g:fuf_keyPrevPattern = '<C-o>'
 <
         Key mapped to recall previous entered patten from history.
 
                                                      *g:fuf_keyNextPattern*  >
-  let g:fuf_keyNextPattern = '<C-^>'
+  let g:fuf_keyNextPattern = '<C-_>'
 <
         Key mapped to recall next entered patten from history.
 
@@ -667,6 +688,11 @@ For All Modes ~
 <
         String which sparates a input pattern into a primary pattern and
         refining patterns.
+
+                                                    *g:fuf_promptHighlight*  >
+  let g:fuf_promptHighlight = 'Question'
+<
+        a highlight group name for a prompt string.
 
                                                          *g:fuf_ignoreCase*  >
   let g:fuf_ignoreCase = 1
@@ -719,12 +745,13 @@ For Buffer Mode ~
                                                       *g:fuf_buffer_prompt*  >
   let g:fuf_buffer_prompt = '>Buffer>'
 <
-        A prompt string.
+        Prompt string.
 
-                                             *g:fuf_buffer_promptHighlight*  >
-  let g:fuf_buffer_promptHighlight = 'Question'
+                                                 *g:fuf_buffer_switchOrder*  >
+  let g:fuf_buffer_switchOrder = 10
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                     *g:fuf_buffer_mruOrder*  >
   let g:fuf_buffer_mruOrder = 1
@@ -737,12 +764,13 @@ For File Mode ~
                                                         *g:fuf_file_prompt*  >
   let g:fuf_file_prompt = '>File>'
 <
-        A prompt string.
+        Prompt string.
 
-                                               *g:fuf_file_promptHighlight*  >
-  let g:fuf_file_promptHighlight = 'Question'
+                                                   *g:fuf_file_switchOrder*  >
+  let g:fuf_file_switchOrder = 20
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                        *g:fuf_file_exclude*  >
   let g:fuf_file_exclude = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$'
@@ -756,12 +784,13 @@ For Directory Mode ~
                                                          *g:fuf_dir_prompt*  >
   let g:fuf_dir_prompt = '>Dir>'
 <
-        A prompt string.
+        Prompt string.
 
-                                                *g:fuf_dir_promptHighlight*  >
-  let g:fuf_dir_promptHighlight = 'Question'
+                                                    *g:fuf_dir_switchOrder*  >
+  let g:fuf_dir_switchOrder = 30
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                         *g:fuf_dir_exclude*  >
   let g:fuf_dir_exclude = ''
@@ -775,12 +804,13 @@ For Mru-File Mode ~
                                                      *g:fuf_mrufile_prompt*  >
   let g:fuf_mrufile_prompt = '>MruFile>'
 <
-        A prompt string.
+        Prompt string.
 
-                                            *g:fuf_mrufile_promptHighlight*  >
-  let g:fuf_mrufile_promptHighlight = 'Question'
+                                                *g:fuf_mrufile_switchOrder*  >
+  let g:fuf_mrufile_switchOrder = 40
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                     *g:fuf_mrufile_exclude*  >
   let g:fuf_mrufile_exclude = '\v\~$|\.bak$|\.swp$'
@@ -799,12 +829,13 @@ For Mru-Cmd Mode ~
                                                       *g:fuf_mrucmd_prompt*  >
   let g:fuf_mrucmd_prompt = '>MruCmd>'
 <
-        A prompt string.
+        Prompt string.
 
-                                             *g:fuf_mrucmd_promptHighlight*  >
-  let g:fuf_mrucmd_promptHighlight = 'Question'
+                                                 *g:fuf_mrucmd_switchOrder*  >
+  let g:fuf_mrucmd_switchOrder = 50
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                      *g:fuf_mrucmd_exclude*  >
   let g:fuf_mrucmd_exclude = '^$'
@@ -823,12 +854,13 @@ For Bookmark Mode ~
                                                     *g:fuf_bookmark_prompt*  >
   let g:fuf_bookmark_prompt = '>Bookmark>'
 <
-        A prompt string.
+        Prompt string.
 
-                                           *g:fuf_bookmark_promptHighlight*  >
-  let g:fuf_bookmark_promptHighlight = 'Question'
+                                               *g:fuf_bookmark_switchOrder*  >
+  let g:fuf_bookmark_switchOrder = 60
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                                *g:fuf_bookmark_searchRange*  >
   let g:fuf_bookmark_searchRange = 400
@@ -842,12 +874,13 @@ For Tag Mode ~
                                                          *g:fuf_tag_prompt*  >
   let g:fuf_tag_prompt = '>Tag>'
 <
-        A prompt string.
+        Prompt string.
 
-                                                *g:fuf_tag_promptHighlight*  >
-  let g:fuf_tag_promptHighlight = 'Question'
+                                                    *g:fuf_tag_switchOrder*  >
+  let g:fuf_tag_switchOrder = 70
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
                                              *fuf-options-for-taggedfile-mode*
 For Tagged-File Mode ~
@@ -855,12 +888,13 @@ For Tagged-File Mode ~
                                                   *g:fuf_taggedfile_prompt*  >
   let g:fuf_taggedfile_prompt = '>TaggedFile>'
 <
-        A prompt string.
+        Prompt string.
 
-                                         *g:fuf_taggedfile_promptHighlight*  >
-  let g:fuf_taggedfile_promptHighlight = 'Question'
+                                             *g:fuf_taggedfile_switchOrder*  >
+  let g:fuf_taggedfile_switchOrder = 80
 <
-        a highlight group name for a prompt string.
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
 
 
 ==============================================================================
@@ -907,6 +941,18 @@ SPECIAL THANKS                                                    *fuf-thanks*
 
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
+
+3.2:
+  - Added g:fuf_promptHighlight option to integrate such options for each
+    mode.
+  - Changed APIs of Given-File, Given-Directory, Given-Command, Callback-File,
+    and Callback-Item modes to be able to set a prompt string.
+  - Changed default values of g:fuf_keyPrevPattern and g:fuf_keyNextPattern.
+  - Fixed a bug that MRU-File data was not updated When a file was opened with
+    FuzzyFinder.
+  - Fixed a bug with scoring matchings for sorting. Thanks to Vincent.
+  - Brought back the removed feature which is switching to an other mode in
+    FuzzyFinder.
 
 3.1:
   - Added new feature to recall patterns which have been entered before from

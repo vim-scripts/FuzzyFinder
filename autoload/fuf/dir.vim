@@ -19,6 +19,11 @@ function fuf#dir#createHandler(base)
 endfunction
 
 "
+function fuf#dir#getSwitchOrder()
+  return g:fuf_dir_switchOrder
+endfunction
+
+"
 function fuf#dir#renewCache()
   let s:cache = {}
 endfunction
@@ -70,11 +75,6 @@ endfunction
 "
 function s:handler.getPrompt()
   return g:fuf_dir_prompt
-endfunction
-
-"
-function s:handler.getPromptHighlight()
-  return g:fuf_dir_promptHighlight
 endfunction
 
 "
