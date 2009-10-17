@@ -41,15 +41,15 @@ function fuf#callbackitem#launch(initialPattern, partialMatching, prompt, listen
   let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
   let s:listener = a:listener
   let s:forPath = a:forPath
+  let s:items = copy(a:items)
   if s:forPath
-    let s:items = map(copy(a:items), 'fuf#makePathItem(v:val, 1)')
+    call map(s:items, 'fuf#makePathItem(v:val, "", 1)')
     call fuf#mapToSetSerialIndex(s:items, 1)
     call fuf#mapToSetAbbrWithSnippedWordAsPath(s:items)
   else
-    let s:items = map(copy(a:items), '{ "word" : v:val }')
-    let s:items = map(s:items, 'fuf#setBoundariesWithWord(v:val)')
+    call map(s:items, 'fuf#makeNonPathItem(v:val, "")')
     call fuf#mapToSetSerialIndex(s:items, 1)
-    let s:items = map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
+    call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
   endif
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
 endfunction
@@ -83,15 +83,8 @@ endfunction
 
 "
 function s:handler.onComplete(patternSet)
-  if s:forPath
-    return fuf#filterMatchesAndMapToSetRanks(
-          \ s:items, a:patternSet,
-          \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
-  else
-    return fuf#filterMatchesAndMapToSetRanks(
-          \ s:items, a:patternSet,
-          \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
-  endif
+  return fuf#filterMatchesAndMapToSetRanks(
+        \ s:items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

@@ -54,8 +54,7 @@ function s:enumTags(tagFiles)
   " cache not created or tags file updated? 
   if !exists('s:cache[key]') || max(map(copy(a:tagFiles), 'getftime(v:val) >= s:cache[key].time'))
     let items = fuf#unique(fuf#concat(map(copy(a:tagFiles), 's:getTagList(v:val)')))
-    let items = map(items, '{ "word" : v:val }')
-    let items = map(items, 'fuf#setBoundariesWithWord(v:val)')
+    let items = map(items, 'fuf#makeNonPathItem(v:val, "")')
     call fuf#mapToSetSerialIndex(items, 1)
     let items = map(items, 'fuf#setAbbrWithFormattedWord(v:val)')
     let s:cache[key] = { 'time'  : localtime(), 'items' : items }
@@ -92,9 +91,9 @@ endfunction
 
 "
 function s:handler.onComplete(patternSet)
+  let items = s:enumTags(self.tagFiles)
   return fuf#filterMatchesAndMapToSetRanks(
-        \ s:enumTags(self.tagFiles), a:patternSet,
-        \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
+        \ items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

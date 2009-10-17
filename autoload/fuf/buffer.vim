@@ -57,12 +57,15 @@ endfunction
 
 "
 function s:makeItem(nr)
-  let item = fuf#makePathItem((empty(bufname(a:nr)) ? '[No Name]' : fnamemodify(bufname(a:nr), ':~:.')), 0)
+  let fname = (empty(bufname(a:nr))
+        \      ? '[No Name]'
+        \      : fnamemodify(bufname(a:nr), ':~:.'))
+  let time = (exists('s:bufTimes[a:nr]') ? s:bufTimes[a:nr] : 0)
+  let item = fuf#makePathItem(fname, strftime(g:fuf_timeFormat, time), 0)
   let item.index = a:nr
   let item.bufNr = a:nr
+  let item.time = time
   let item.abbrPrefix = s:getBufIndicator(a:nr) . ' '
-  let item.time = (exists('s:bufTimes[a:nr]') ? s:bufTimes[a:nr] : 0)
-  call fuf#setMenuWithFormattedTime(item)
   return item
 endfunction
 
@@ -108,8 +111,7 @@ endfunction
 "
 function s:handler.onComplete(patternSet)
   return fuf#filterMatchesAndMapToSetRanks(
-        \ self.items, a:patternSet,
-        \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
+        \ self.items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

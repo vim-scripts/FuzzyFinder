@@ -57,6 +57,20 @@ function s:enumItems(dir)
   return s:cache[key]
 endfunction
 
+"
+function s:enumNonCurrentItems(dir, bufNr, cache)
+  let key = a:dir . 'AVOIDING EMPTY KEY'
+  if !exists('a:cache[key]')
+    " NOTE: filtering should be done with
+    "       'bufnr("^" . v:val.word . "$") != a:bufNr'.
+    "       But it takes a lot of time!
+    let bufName = bufname(a:bufNr)
+    let a:cache[key] =
+          \ filter(copy(s:enumItems(a:dir)), 'v:val.word != bufName')
+  endif
+  return a:cache[key]
+endfunction
+
 " }}}1
 "=============================================================================
 " s:handler {{{1
@@ -80,17 +94,10 @@ endfunction
 
 "
 function s:handler.onComplete(patternSet)
-  let key = a:patternSet.rawHead . 'AVOIDING EMPTY KEY'
-  if !exists('self.cache[key]')
-    " NOTE: filtering should be done with 'bufnr("^" . v:val.word . "$") != self.bufNrPrev'.
-    "       But it takes a lot of time!
-    let bufName = bufname(self.bufNrPrev)
-    let self.cache[key] = filter(copy(s:enumItems(a:patternSet.rawHead)),
-          \                      'v:val.word != bufName')
-  endif
+  let items = s:enumNonCurrentItems(
+        \ fuf#splitPath(a:patternSet.raw).head, self.bufNrPrev, self.cache)
   return fuf#filterMatchesAndMapToSetRanks(
-        \ self.cache[key], a:patternSet,
-        \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
+        \ items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

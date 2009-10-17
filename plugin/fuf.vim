@@ -5,7 +5,10 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if exists('g:loaded_fuf') || v:version < 702
+if exists('g:loaded_fuf')
+  finish
+elseif v:version < 702
+  echoerr 'FuzzyFinder does not support this version of vim (' . v:version . ').'
   finish
 endif
 let g:loaded_fuf = 1
@@ -19,8 +22,10 @@ function s:initialize()
   "---------------------------------------------------------------------------
   call s:defineOption('g:fuf_modes'  , [
         \   'buffer', 'file', 'dir', 'mrufile', 'mrucmd',
-        \   'bookmark', 'tag', 'taggedfile', 'givenfile',
-        \   'givendir', 'givencmd', 'callbackfile', 'callbackitem',
+        \   'bookmark', 'tag', 'taggedfile',
+        \   'jumplist', 'changelist', 'quickfix',
+        \   'givenfile', 'givendir', 'givencmd',
+        \   'callbackfile', 'callbackitem',
         \ ])
   call s:defineOption('g:fuf_modesDisable'  , [ 'mrufile', 'mrucmd', ])
   call s:defineOption('g:fuf_keyOpen'         , '<CR>')
@@ -29,7 +34,7 @@ function s:initialize()
   call s:defineOption('g:fuf_keyOpenTabpage'  , '<C-l>')
   call s:defineOption('g:fuf_keyNextMode'     , '<C-t>')
   call s:defineOption('g:fuf_keyPrevMode'     , '<C-y>')
-  call s:defineOption('g:fuf_keyPrevPattern'  , '<C-o>')
+  call s:defineOption('g:fuf_keyPrevPattern'  , '<C-s>')
   call s:defineOption('g:fuf_keyNextPattern'  , '<C-_>')
   call s:defineOption('g:fuf_infoFile'        , '~/.vim-fuf')
   call s:defineOption('g:fuf_abbrevMap'       , {})
@@ -56,12 +61,12 @@ function s:initialize()
   call s:defineOption('g:fuf_dir_switchOrder', 30)
   call s:defineOption('g:fuf_dir_exclude'    , '')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_mrufile_prompt'     , '>MruFile>')
+  call s:defineOption('g:fuf_mrufile_prompt'     , '>Mru-File>')
   call s:defineOption('g:fuf_mrufile_switchOrder', 40)
   call s:defineOption('g:fuf_mrufile_exclude'    , '\v\~$|\.bak$|\.swp$')
   call s:defineOption('g:fuf_mrufile_maxItem'    , 200)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_mrucmd_prompt'     , '>MruCmd>')
+  call s:defineOption('g:fuf_mrucmd_prompt'     , '>Mru-Cmd>')
   call s:defineOption('g:fuf_mrucmd_switchOrder', 50)
   call s:defineOption('g:fuf_mrucmd_exclude'    , '^$')
   call s:defineOption('g:fuf_mrucmd_maxItem'    , 200)
@@ -69,12 +74,22 @@ function s:initialize()
   call s:defineOption('g:fuf_bookmark_prompt'     , '>Bookmark>')
   call s:defineOption('g:fuf_bookmark_switchOrder', 60)
   call s:defineOption('g:fuf_bookmark_searchRange', 400)
+  call s:defineOption('g:fuf_bookmark_keyDelete'  , '<C-]>')
   "---------------------------------------------------------------------------
   call s:defineOption('g:fuf_tag_prompt'     , '>Tag>')
   call s:defineOption('g:fuf_tag_switchOrder', 70)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_taggedfile_prompt'     , '>TaggedFile>')
+  call s:defineOption('g:fuf_taggedfile_prompt'     , '>Tagged-File>')
   call s:defineOption('g:fuf_taggedfile_switchOrder', 80)
+  "---------------------------------------------------------------------------
+  call s:defineOption('g:fuf_jumplist_prompt'     , '>Jump-List>')
+  call s:defineOption('g:fuf_jumplist_switchOrder', 90)
+  "---------------------------------------------------------------------------
+  call s:defineOption('g:fuf_changelist_prompt'     , '>Change-List>')
+  call s:defineOption('g:fuf_changelist_switchOrder', 100)
+  "---------------------------------------------------------------------------
+  call s:defineOption('g:fuf_quickfix_prompt'     , '>Quickfix>')
+  call s:defineOption('g:fuf_quickfix_switchOrder', 110)
   "---------------------------------------------------------------------------
   call filter(g:fuf_modes, 'count(g:fuf_modesDisable, v:val) == 0')
   for m in g:fuf_modes

@@ -39,7 +39,7 @@ endfunction
 "
 function fuf#givenfile#launch(initialPattern, partialMatching, prompt, items)
   let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
-  let s:items = map(copy(a:items), 'fuf#makePathItem(v:val, 0)')
+  let s:items = map(copy(a:items), 'fuf#makePathItem(v:val, "", 0)')
   call fuf#mapToSetSerialIndex(s:items, 1)
   call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
@@ -76,8 +76,7 @@ endfunction
 "
 function s:handler.onComplete(patternSet)
   return fuf#filterMatchesAndMapToSetRanks(
-        \ s:items, a:patternSet,
-        \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
+        \ s:items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

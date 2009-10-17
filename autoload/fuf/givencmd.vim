@@ -39,10 +39,10 @@ endfunction
 "
 function fuf#givencmd#launch(initialPattern, partialMatching, prompt, items)
   let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
-  let s:items = map(copy(a:items), '{ "word" : v:val }')
-  let s:items = map(s:items, 'fuf#setBoundariesWithWord(v:val)')
+  let s:items = copy(a:items)
+  call map(s:items, 'fuf#makeNonPathItem(v:val, "")')
   call fuf#mapToSetSerialIndex(s:items, 1)
-  let s:items = map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
+  call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
 endfunction
 
@@ -76,8 +76,7 @@ endfunction
 "
 function s:handler.onComplete(patternSet)
   return fuf#filterMatchesAndMapToSetRanks(
-        \ s:items, a:patternSet,
-        \ self.getFilteredStats(a:patternSet.raw), self.targetsPath())
+        \ s:items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
 endfunction
 
 "

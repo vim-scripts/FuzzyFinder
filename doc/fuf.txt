@@ -11,7 +11,7 @@ MODES                           |fuf-modes|
 DETAILED TOPICS                 |fuf-detailed-topics|
 COMMANDS                        |fuf-commands|
 OPTIONS                         |fuf-options|
-VIMRC EXAMPLE                   |fuf-vimrc-sample|
+VIMRC EXAMPLE                   |fuf-vimrc-example|
 SPECIAL THANKS                  |fuf-thanks|
 CHANGELOG                       |fuf-changelog|
 ABOUT                           |fuf-about|
@@ -50,6 +50,9 @@ FuzzyFinder can search:
         - bookmarks
         - tags
         - files which are included in current tagfiles
+        - jump list
+        - change list
+        - quickfix
 
 FuzzyFinder also provides APIs to use its system of searching files or
 selecting items.
@@ -91,6 +94,9 @@ You can launch FuzzyFinder by following commands:
         |:FufBookmark|   - Bookmark mode (|fuf-bookmark-mode|)
         |:FufTag|        - Tag mode (|fuf-tag-mode|)
         |:FufTaggedFile| - Tagged-File mode (|fuf-taggedfile-mode|)
+        |:FufJumpList|   - Jump-List mode (|fuf-jumplist-mode|)
+        |:FufChangeList| - Change-List mode (|fuf-changelist-mode|)
+        |:FufQuickfix|   - Quickfix mode (|fuf-quickfix-mode|)
 
 It is recommended to map these commands.
 
@@ -107,7 +113,7 @@ highlights the pattern with "Error" group.
 
 The first item in the completion menu will be selected automatically.
 
-with <C-t> (|g:fuf_keyPrevPattern|) and <C-^> (|g:fuf_keyNextPattern|), You
+with <C-s> (|g:fuf_keyPrevPattern|) and <C-^> (|g:fuf_keyNextPattern|), You
 can recall patterns which have been entered before from history.
 
 You can open a selected item in various ways:
@@ -168,6 +174,9 @@ Bookmark mode ~
 This mode provides an interface to select one of the bookmarks you have added
 beforehand and jump to the line of the bookmark.
 
+You can add a cursor line to bookmarks by |:FufAddBookmark| command.
+Execute that command and you will be prompted to enter a bookmark name.
+
 FuzzyFinder adjusts a line number for jump. If a line of bookmarked position
 does not match to a pattern when the bookmark was added, FuzzyFinder searches
 a matching line around bookmarked position. So you can jump to a bookmarked
@@ -175,10 +184,8 @@ line even if the line is out of bookmarked position. If you want to jump to
 bookmarked line number without the adjustment, set
 |g:fuf_bookmark_searchRange| option to 0.
 
-You can add a cursor line to bookmarks by |:FufAddBookmark| command.
-Execute that command and you will be prompted to enter a bookmark name.
-
-To delete bookmarks, use |:FufEditInfo| command.
+Press <C-]> (|g:fuf_bookmark_keyDelete|) in Bookmark mode and selected
+bookmark will be deleted.
 
                                                                 *fuf-tag-mode*
 Tag mode ~
@@ -196,6 +203,24 @@ Tagged-File mode ~
 
 This mode provides an interface to select one of the files which are included
 in current tagfiles and open it.
+
+                                                           *fuf-jumplist-mode*
+Jump-List mode ~
+
+This mode provides an interface to select one from the |jumplist| of the
+current window and jump to the position.
+
+                                                         *fuf-changelist-mode*
+Change-List mode ~
+
+This mode provides an interface to select one from the |changelist| of the
+current buffer and jump to the position.
+
+                                                           *fuf-quickfix-mode*
+Quickfix mode ~
+
+This mode provides an interface to select one from the |quickfix| list and
+jump to the position.
 
                                                           *fuf-givenfile-mode*
 Given-File mode ~
@@ -494,7 +519,7 @@ Migemo is a search method for Japanese language.
 ==============================================================================
 COMMANDS                                                        *fuf-commands*
 
-See also: |fuf-vimrc-sample|
+See also: |fuf-vimrc-example|
 
                                                                   *:FufBuffer*
 :FufBuffer[!] [{pattern}]
@@ -592,6 +617,33 @@ See also: |fuf-vimrc-sample|
 
         {pattern} will be inserted after launching FuzzyFinder.
 
+                                                                *:FufJumpList*
+:FufJumpList[!] [{pattern}]
+        Launchs Jump-List mode.
+
+        If a command was executed with a ! modifier, it does a partial
+        matching instead of a fuzzy matching.
+
+        {pattern} will be inserted after launching FuzzyFinder.
+
+                                                              *:FufChangeList*
+:FufChangeList[!] [{pattern}]
+        Launchs Change-List mode.
+
+        If a command was executed with a ! modifier, it does a partial
+        matching instead of a fuzzy matching.
+
+        {pattern} will be inserted after launching FuzzyFinder.
+
+                                                                *:FufQuickfix*
+:FufQuickfix[!] [{pattern}]
+        Launchs Quickfix mode.
+
+        If a command was executed with a ! modifier, it does a partial
+        matching instead of a fuzzy matching.
+
+        {pattern} will be inserted after launching FuzzyFinder.
+
                                                                 *:FufEditInfo*
 :FufEditInfo
         Opens a buffer for editing your information file. See
@@ -662,7 +714,7 @@ For All Modes ~
         Key mapped to switch to previous mode.
 
                                                      *g:fuf_keyPrevPattern*  >
-  let g:fuf_keyPrevPattern = '<C-o>'
+  let g:fuf_keyPrevPattern = '<C-s>'
 <
         Key mapped to recall previous entered patten from history.
 
@@ -802,7 +854,7 @@ For Directory Mode ~
 For Mru-File Mode ~
 
                                                      *g:fuf_mrufile_prompt*  >
-  let g:fuf_mrufile_prompt = '>MruFile>'
+  let g:fuf_mrufile_prompt = '>Mru-File>'
 <
         Prompt string.
 
@@ -827,7 +879,7 @@ For Mru-File Mode ~
 For Mru-Cmd Mode ~
 
                                                       *g:fuf_mrucmd_prompt*  >
-  let g:fuf_mrucmd_prompt = '>MruCmd>'
+  let g:fuf_mrucmd_prompt = '>Mru-Cmd>'
 <
         Prompt string.
 
@@ -868,6 +920,11 @@ For Bookmark Mode ~
         Number of lines which FuzzyFinder searches a matching line from
         bookmarked position within.
 
+                                                 *g:fuf_bookmark_keyDelete*  >
+  let g:fuf_bookmark_keyDelete = '<C-]>'
+<
+        Key mapped to delete selected bookmark.
+
                                                     *fuf-options-for-tag-mode*
 For Tag Mode ~
 
@@ -886,7 +943,7 @@ For Tag Mode ~
 For Tagged-File Mode ~
 
                                                   *g:fuf_taggedfile_prompt*  >
-  let g:fuf_taggedfile_prompt = '>TaggedFile>'
+  let g:fuf_taggedfile_prompt = '>Tagged-File>'
 <
         Prompt string.
 
@@ -896,9 +953,51 @@ For Tagged-File Mode ~
         Number of order for switching to the next/previous mode. If negative
         number, Fuzzyfinder never switches to this mode.
 
+                                               *fuf-options-for-jumplist-mode*
+For Jump-List Mode ~
+
+                                                    *g:fuf_jumplist_prompt*  >
+  let g:fuf_jumplist_prompt = '>Jump-List>'
+<
+        Prompt string.
+
+                                               *g:fuf_jumplist_switchOrder*  >
+  let g:fuf_jumplist_switchOrder = 90
+<
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
+
+                                             *fuf-options-for-changelist-mode*
+For Change-List Mode ~
+
+                                                  *g:fuf_changelist_prompt*  >
+  let g:fuf_changelist_prompt = '>Change-List>'
+<
+        Prompt string.
+
+                                             *g:fuf_changelist_switchOrder*  >
+  let g:fuf_changelist_switchOrder = 100
+<
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
+
+                                             *fuf-options-for-quickfix-mode*
+For Quickfix Mode ~
+
+                                                  *g:fuf_quickfix_prompt*  >
+  let g:fuf_quickfix_prompt = '>Quickfix>'
+<
+        Prompt string.
+
+                                             *g:fuf_quickfix_switchOrder*  >
+  let g:fuf_quickfix_switchOrder = 110
+<
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
+
 
 ==============================================================================
-VIMRC EXAMPLE                                               *fuf-vimrc-sample*
+VIMRC EXAMPLE                                              *fuf-vimrc-example*
 
 >
   let g:fuf_modesDisable = []
@@ -922,6 +1021,9 @@ VIMRC EXAMPLE                                               *fuf-vimrc-sample*
   nnoremap <silent> <C-f>t     :FufTag!<CR>
   noremap  <silent> g]         :FufTagWithCursorWord!<CR>
   nnoremap <silent> <C-f><C-f> :FufTaggedFile<CR>
+  nnoremap <silent> <C-f><C-j> :FufJumpList<CR>
+  nnoremap <silent> <C-f><C-g> :FufChangeList<CR>
+  nnoremap <silent> <C-f><C-q> :FufQuickfix<CR>
   nnoremap <silent> <C-f><C-b> :FufAddBookmark<CR>
   vnoremap <silent> <C-f><C-b> :FufAddBookmarkAsSelectedText<CR>
   nnoremap <silent> <C-f><C-e> :FufEditInfo<CR>
@@ -941,6 +1043,14 @@ SPECIAL THANKS                                                    *fuf-thanks*
 
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
+
+3.3:
+  - Added Jump-List mode, Change-List mode, and Quickfix mode which enable
+    jumps with jump list, change list, and quickfix list.
+  - Added new feature which deletes selected bookmark with FuzzyFinder and
+    g:fuf_bookmark_keyDelete option.
+  - Changed default values of g:fuf_keyPrevPattern.
+  - Changed to show error message when incompatible with a installed vim.
 
 3.2:
   - Added g:fuf_promptHighlight option to integrate such options for each
