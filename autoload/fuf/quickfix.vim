@@ -61,10 +61,13 @@ function s:makeItem(qfItem)
   if !a:qfItem.valid
     return {}
   endif
-  return fuf#makeNonPathItem(
+  let item = fuf#makeNonPathItem(
         \ printf('%s|%d:%d|%s', bufname(a:qfItem.bufnr), a:qfItem.lnum,
         \        a:qfItem.col, matchstr(a:qfItem.text, '\s*\zs.*\S'))
         \ , '')
+  let item.bufnr = a:qfItem.bufnr
+  let item.lnum = a:qfItem.lnum
+  return item
 endfunction
 
 " }}}1
@@ -84,20 +87,41 @@ function s:handler.getPrompt()
 endfunction
 
 "
+function s:handler.getPreviewHeight()
+  return g:fuf_previewHeight
+endfunction
+
+"
 function s:handler.targetsPath()
   return 0
 endfunction
 
 "
-function s:handler.onComplete(patternSet)
-  return fuf#filterMatchesAndMapToSetRanks(
-        \ self.items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
+function s:handler.makePatternSet(patternBase)
+  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForNonPath',
+        \                   self.partialMatching)
 endfunction
 
 "
-function s:handler.onOpen(expr, mode)
+function s:handler.makePreviewLines(word, count)
+  let items = filter(copy(self.items), 'v:val.word ==# a:word')
+  if empty(items)
+    return []
+  endif
+  let lines = fuf#getFileLines(items[0].bufnr)
+  return fuf#makePreviewLinesAround(
+        \ lines, [items[0].lnum - 1], a:count, self.getPreviewHeight())
+endfunction
+
+"
+function s:handler.getCompleteItems(patternPrimary)
+  return self.items
+endfunction
+
+"
+function s:handler.onOpen(word, mode)
   call fuf#prejump(a:mode)
-  call filter(self.items, 'v:val.word ==# a:expr')
+  call filter(self.items, 'v:val.word ==# a:word')
   if !empty(self.items)
     execute 'cc ' . self.items[0].index
   endif

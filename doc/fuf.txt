@@ -20,7 +20,7 @@ ABOUT                           |fuf-about|
 INTRODUCTION                                                *fuf-introduction*
 
 FuzzyFinder provides convenient ways to quickly reach the
-buffer/file/command/bookmark/tag you want. FuzzyFinder searches by the
+buffer/file/command/bookmark/tag you want. FuzzyFinder searches with the
 fuzzy/partial pattern to which it converted an entered pattern.
 
         Entered pattern  Fuzzy pattern   Partial pattern ~
@@ -104,7 +104,7 @@ These commands open 1-line buffer to enter search pattern and start insert
 mode.
 
 FuzzyFinder searchs for matching items with an entered pattern and shows them
-in a completion menu. For more details on a pattern matching, see
+in a completion menu. For more details on pattern matching, see
 |fuf-search-patterns|.
 
 If there are a lot of matching items, FuzzyFinder limits the number of
@@ -127,6 +127,11 @@ To cancel and return to previous window, just leave Insert mode.
 
 With <C-t> (|g:fuf_keyNextMode|) and <C-y> (|g:fuf_keyPrevMode|), You can
 switch current mode without leaving Insert mode .
+
+You can preview selected item with <C-@> (|g:fuf_keyPreview|) in some modes.
+Repeating the key on the same item might show another information. The height
+of command-line area is changed to |g:fuf_previewHeight| when you launch a
+mode supporting preview.
 
 
 ==============================================================================
@@ -404,42 +409,63 @@ You can enter one primary pattern and zero or more refining patterns as search
 patterns. An entered pattern is separated by ";" (|g:fuf_patternSeparator|),
 and the first pattern is a primary pattern and the rest of patterns is a
 refining pattern.
-
+>
+                   primary    refining  refining
+                 |----------| |-------| |----|
+        >MruFile>bookmark.vim;autoload/;/home/
+<
 A refining pattern is used to narrow down the list of matching items by
 another pattern.
 
-With a primary pattern, FuzzyFinder does the selected one of a fuzzy matching
-and a partial matching. With a refining pattern, FuzzyFinder always does a
-partial matching.
-
-If current mode targets file paths, a primary pattern can match 
-only the tail (last component) of each path.
-With a refining pattern in such case, it can match anywhere on each
-path.
+With a primary pattern, FuzzyFinder does fuzzy matching or partial matching,
+which you specified. With a refining pattern, FuzzyFinder always does partial
+matching.
 
 When you enter a number as refining pattern, it also can match the index of
 each item.
 
-If current mode targets file paths, the matching with a primary pattern is
-done only for the tail (last component) of each path.
+In a mode which targets a static set of file paths (such as Buffer or MRU-File
+mode, not File or Directory) and |g:fuf_splitPathMatching| is non-zero,
+matching with a primary pattern is divided into head part and tail part and
+done individually.
+>
+          head   tail
+        |------||-----|
+        foo/bar/baz.vim
+
+        fuzzy matching example:
+        +----------------+---------+---------+---------+
+        | item \ pattern | foo/bar | foo/    | bar     |
+        +----------------+---------+---------+---------+
+        | foo/bar        |   match |   match |   match |
+        | foo/abc        | unmatch |   match | unmatch |
+        | abc/bar        | unmatch | unmatch |   match |
+        | foobar         | unmatch | unmatch |   match |
+        | foooo/barrrr   |   match |   match |   match |
+        | foooo/fooooo   | unmatch |   match | unmatch |
+        +----------------+---------+---------+---------+
+<
+refining pattern can match anywhere on each path in the above case.
 
                                              *fuf-sorting-of-completion-items*
-Sorting of Completion Items ~
+Sorting Of Completion Items ~
 
-FuzzyFinder sorts completion items with some rules:
+FuzzyFinder sorts completion items with some rules.
 
-        - If a pattern consists only of uppercase characters and matches an
-          item at only word boundaries of it, the item is placed upper. E.g.,
-          with a pattern "FB", items such as "fooBarBaz" and
-          "foo_bar_baz" is placed upper.
-        - An item, one part of which is matched with a whole pattern, is
-          placed upper. E.g., with the pattern "bc", the item "abc" is placed
-          upper than "bac". In such case, items, each having matching part at
-          the head of itself, are placed upper than others. E.g., with the
-          pattern "foo", the item "foobar" is placed upper than "foobarbaz".
-          And the shorter the length of the item after matching position puts
-          it higher. E.g., with the pattern "bar", the item "foobar" is placed
-          upper than "foobarbaz".
+An item, one part of which is matched with a whole pattern, is placed upper.
+E.g., with the pattern "bc", the item "abc" is placed upper than "bac".
+
+In the above case, items, each having matching part at the head of itself, are
+placed upper than others. E.g., with the pattern "foo", the item "foobar" is
+placed upper than "foobarbaz".
+
+And the shorter the length of the item after matching position puts it higher.
+E.g., with the pattern "bar", the item "foobar" is placed upper than
+"foobarbaz".
+
+If a pattern matches an item at only word boundaries of it, the item is placed
+upper. E.g., with a pattern "fb", items such as "fooBarBaz" and "foo_bar_baz"
+is placed upper.
 
 Plus, FuzzyFinder has a learning system. An item which has been completed in
 the past with current pattern is placed upper.
@@ -525,8 +551,8 @@ See also: |fuf-vimrc-example|
 :FufBuffer[!] [{pattern}]
         Launchs Buffer mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -534,8 +560,8 @@ See also: |fuf-vimrc-example|
 :FufFile[!] [{pattern}]
         Launchs File mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -553,8 +579,8 @@ See also: |fuf-vimrc-example|
 :FufDir[!] [{pattern}]
         Launchs Directory mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -572,8 +598,8 @@ See also: |fuf-vimrc-example|
 :FufMruFile[!] [{pattern}]
         Launchs MRU-File mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -581,8 +607,8 @@ See also: |fuf-vimrc-example|
 :FufMruCmd[!] [{pattern}]
         Launchs MRU-Command mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -590,8 +616,8 @@ See also: |fuf-vimrc-example|
 :FufBookmark[!] [{pattern}]
         Launchs Bookmark mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -599,8 +625,8 @@ See also: |fuf-vimrc-example|
 :FufTag[!] [{pattern}]
         Launchs Tag mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -612,8 +638,8 @@ See also: |fuf-vimrc-example|
 :FufTaggedFile[!] [{pattern}]
         Launchs Tagged-File mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -621,8 +647,8 @@ See also: |fuf-vimrc-example|
 :FufJumpList[!] [{pattern}]
         Launchs Jump-List mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -630,8 +656,8 @@ See also: |fuf-vimrc-example|
 :FufChangeList[!] [{pattern}]
         Launchs Change-List mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -639,8 +665,8 @@ See also: |fuf-vimrc-example|
 :FufQuickfix[!] [{pattern}]
         Launchs Quickfix mode.
 
-        If a command was executed with a ! modifier, it does a partial
-        matching instead of a fuzzy matching.
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
 
         {pattern} will be inserted after launching FuzzyFinder.
 
@@ -703,6 +729,14 @@ For All Modes ~
         Key mapped to select completion item or finish input and open a
         buffer/file in a new tab page.
 
+                                                         *g:fuf_keyPreview*  >
+  let g:fuf_keyPreview = '<C-@>'
+<
+
+        Key mapped to show information of selected completion item on
+        command-line area. This key makes sense only in modes supporting
+        preview.
+
                                                         *g:fuf_keyNextMode*  >
   let g:fuf_keyNextMode = '<C-t>'
 <
@@ -751,6 +785,14 @@ For All Modes ~
 <
         If non-zero, FuzzyFinder ignores case in search patterns.
 
+                                                  *g:fuf_splitPathMatching*  >
+  let g:fuf_splitPathMatching = 1
+<
+        If non-zero, matching with a primary pattern is divided into head part
+        and tail part and done individually.
+
+        See also: |fuf-search-patterns|
+
                                                             *g:fuf_smartBs*  >
   let g:fuf_smartBs = 1
 <
@@ -785,6 +827,13 @@ For All Modes ~
 <
         If a length of a completion item is more than this, it is snipped in
         completion menu.
+
+                                                      *g:fuf_previewHeight*  >
+  let g:fuf_previewHeight = 5
+<
+        'cmdheight' is set to this when a mode supporting preview is launched.
+        Information of selected completion item will be shown on command-line
+        area.
 
                                                           *g:fuf_useMigemo*  >
   let g:fuf_useMigemo = 0
@@ -825,7 +874,7 @@ For File Mode ~
         number, Fuzzyfinder never switches to this mode.
 
                                                        *g:fuf_file_exclude*  >
-  let g:fuf_file_exclude = '\v\~$|\.o$|\.exe$|\.bak$|\.swp$'
+  let g:fuf_file_exclude = '\v\~$|\.(o|exe|bak|swp)$|(^|[/\\])\.(hg|git|bzr)($|[/\\])'
 <
         Regexp pattern for items which you want to exclude from completion
         list.
@@ -845,7 +894,7 @@ For Directory Mode ~
         number, Fuzzyfinder never switches to this mode.
 
                                                         *g:fuf_dir_exclude*  >
-  let g:fuf_dir_exclude = ''
+  let g:fuf_dir_exclude = '\v(^|[/\\])\.(hg|git|bzr)($|[/\\])'
 <
         Regexp pattern for items which you want to exclude from completion
         list.
@@ -865,7 +914,7 @@ For Mru-File Mode ~
         number, Fuzzyfinder never switches to this mode.
 
                                                     *g:fuf_mrufile_exclude*  >
-  let g:fuf_mrufile_exclude = '\v\~$|\.bak$|\.swp$'
+  let g:fuf_mrufile_exclude = '\v\~$|\.(bak|sw[po])$|^(\/\/|\\\\|\/mnt\/|\/media\/)'
 <
         Regexp pattern for items which you want to exclude from completion
         list.
@@ -1044,6 +1093,19 @@ SPECIAL THANKS                                                    *fuf-thanks*
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
 
+3.4:
+  - Added new feature which makes it possible to preview selected completion
+    item.
+  - Changed matching rules and added g:fuf_splitPathMatching.
+  - Changed sorting rules.
+  - Changed the default values of g:fuf_file_exclude and g:fuf_dir_exclude in
+    order to ignore ".hg", ".git", and ".bzr" directories.
+  - Changed the default value of g:fuf_mrufile_exclude in order to ignore
+    network files (\\*) on Windows and ignore /mnt/* and /media/* on Unix like
+    systems.
+  - Fixed a bug that an exclude pattern of File, Dir, and Callback-File mode
+    can't be changed.
+
 3.3:
   - Added Jump-List mode, Change-List mode, and Quickfix mode which enable
     jumps with jump list, change list, and quickfix list.
@@ -1188,7 +1250,7 @@ CHANGELOG                                                      *fuf-changelog*
   - Removed 'matching_limit' option. Use 'enumerating_limit' instead.
 
 2.13:
-  - Fixed a bug that a directory disappeared when a file in that directroy was
+  - Fixed a bug that a directory disappeared when a file in that directory was
     being opened in File/Mru-File mode.
 
 2.12:
@@ -1198,7 +1260,7 @@ CHANGELOG                                                      *fuf-changelog*
 
 2.11:
   - Changed that a dot sequence of entered pattern is expanded to parent
-    directroies in File/Dir mode.
+    directories in File/Dir mode.
     E.g.: "foo/...bar" -> "foo/../../bar"
   - Fixed a bug that a prompt string was excessively inserted.
 
@@ -1231,7 +1293,7 @@ CHANGELOG                                                      *fuf-changelog*
 2.7:
   - Changed to find an item whose index is matched with the number suffixed
     with entered pattern.
-  - Fixed the cache bug after changing current directroy in File mode.
+  - Fixed the cache bug after changing current directory in File mode.
 
 2.6.2:
   - Fixed not to miss changes in options when updates the MRU information.

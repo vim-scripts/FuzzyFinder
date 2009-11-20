@@ -51,7 +51,7 @@ function s:getTaggedFileList(tagfile)
   call map(readfile(a:tagfile), 'fnamemodify(v:val, ":p")')
   cd -
   call map(readfile(a:tagfile), 'fnamemodify(v:val, ":~:.")')
-  return filter(result, 'v:val =~ ''[^/\\ ]$''')
+  return filter(result, 'v:val =~# ''[^/\\ ]$''')
 endfunction
 
 "
@@ -88,19 +88,34 @@ function s:handler.getPrompt()
 endfunction
 
 "
+function s:handler.getPreviewHeight()
+  return g:fuf_previewHeight
+endfunction
+
+"
 function s:handler.targetsPath()
   return 1
 endfunction
 
 "
-function s:handler.onComplete(patternSet)
-  return fuf#filterMatchesAndMapToSetRanks(
-        \ self.cache, a:patternSet, self.getFilteredStats(a:patternSet.raw))
+function s:handler.makePatternSet(patternBase)
+  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForPath',
+        \                   self.partialMatching)
 endfunction
 
 "
-function s:handler.onOpen(expr, mode)
-  call fuf#openFile(a:expr, a:mode, g:fuf_reuseWindow)
+function s:handler.makePreviewLines(word, count)
+  return fuf#makePreviewLinesForFile(a:word, count, self.getPreviewHeight())
+endfunction
+
+"
+function s:handler.getCompleteItems(patternPrimary)
+  return self.items
+endfunction
+
+"
+function s:handler.onOpen(word, mode)
+  call fuf#openFile(a:word, a:mode, g:fuf_reuseWindow)
 endfunction
 
 "
@@ -111,8 +126,8 @@ endfunction
 "
 function s:handler.onModeEnterPost()
   " NOTE: Don't do this in onModeEnterPre()
-  "       because it should return in a short time 
-  let self.cache =
+  "       because that should return in a short time.
+  let self.items =
         \ filter(copy(s:enumTaggedFiles(self.tagFiles)),
         \        'bufnr("^" . v:val.word . "$") != self.bufNrPrev')
 endfunction

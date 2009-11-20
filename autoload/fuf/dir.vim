@@ -48,10 +48,10 @@ let s:MODE_NAME = expand('<sfile>:t:r')
 
 "
 function s:enumItems(dir)
-  let key = getcwd() . "\n" . a:dir
+  let key = getcwd() . g:fuf_dir_exclude . "\n" . a:dir
   if !exists('s:cache[key]')
     let s:cache[key] = fuf#enumExpandedDirsEntries(a:dir, g:fuf_dir_exclude)
-    call filter(s:cache[key], 'v:val.word =~ ''[/\\]$''')
+    call filter(s:cache[key], 'v:val.word =~# ''[/\\]$''')
     if isdirectory(a:dir)
       call insert(s:cache[key], fuf#makePathItem(a:dir . '.', '', 0))
     endif
@@ -78,20 +78,37 @@ function s:handler.getPrompt()
 endfunction
 
 "
+function s:handler.getPreviewHeight()
+  return g:fuf_previewHeight
+endfunction
+
+"
 function s:handler.targetsPath()
   return 1
 endfunction
 
 "
-function s:handler.onComplete(patternSet)
-  let items = s:enumItems(fuf#splitPath(a:patternSet.raw).head)
-  return fuf#filterMatchesAndMapToSetRanks(
-        \ items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
+function s:handler.makePatternSet(patternBase)
+  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForPathTail',
+        \                   self.partialMatching)
 endfunction
 
 "
-function s:handler.onOpen(expr, mode)
-  execute ':cd ' . fnameescape(a:expr)
+function s:handler.makePreviewLines(word, count)
+  return fuf#makePreviewLinesAround(
+        \ split(glob(fnamemodify(a:word, ':p') . '*'), "\n"),
+        \ [], a:count, self.getPreviewHeight())
+  return 
+endfunction
+
+"
+function s:handler.getCompleteItems(patternPrimary)
+  return s:enumItems(fuf#splitPath(a:patternPrimary).head)
+endfunction
+
+"
+function s:handler.onOpen(word, mode)
+  execute ':cd ' . fnameescape(a:word)
 endfunction
 
 "

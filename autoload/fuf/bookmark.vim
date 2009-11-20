@@ -48,18 +48,18 @@ let s:OPEN_TYPE_DELETE = -1
 
 "
 function s:getSelectedText()
-  let regUN = [@", getregtype('"')]
-  let reg0  = [@0, getregtype('0')]
+  let reg_ = [@", getregtype('"')]
+  let regA = [@a, getregtype('a')]
   if mode() =~# "[vV\<C-v>]"
-    silent normal! ygv
+    silent normal! "aygv
   else
     let pos = getpos('.')
-    silent normal! gvy
+    silent normal! gv"ay
     call setpos('.', pos)
   endif
-  let text = @"
-  call setreg('"', regUN[0], regUN[1])
-  call setreg('0', reg0[0], reg0[1])
+  let text = @a
+  call setreg('"', reg_[0], reg_[1])
+  call setreg('a', regA[0], regA[1])
   return text
 endfunction
 
@@ -67,18 +67,22 @@ endfunction
 " a:range. if not found, jumps to a:lnum.
 function s:jumpToBookmark(path, mode, pattern, lnum)
   call fuf#openFile(a:path, a:mode, g:fuf_reuseWindow)
-  let ln = a:lnum
-  for i in range(0, g:fuf_bookmark_searchRange)
-    if a:lnum + i <= line('$') && getline(a:lnum + i) =~ a:pattern
-      let ln += i
-      break
-    elseif a:lnum - i >= 1 && getline(a:lnum - i) =~ a:pattern
-      let ln -= i
-      break
+  call cursor(s:getMatchingLineNumber(getline(1, '$'), a:pattern, a:lnum), 0)
+  normal! zvzz
+endfunction
+
+"
+function s:getMatchingLineNumber(lines, pattern, lnumBegin)
+  let l = min([a:lnumBegin, len(a:lines)])
+  for [l0, l1] in map(range(0, g:fuf_bookmark_searchRange),
+        \             '[l + v:val, l - v:val]')
+    if l0 <= len(a:lines) && a:lines[l0 - 1] =~# a:pattern
+      return l0
+    elseif l1 >= 0 && a:lines[l1 - 1] =~# a:pattern
+      return l1
     endif
   endfor
-  call cursor(ln, 0)
-  normal! zvzz
+  return l
 endfunction
 
 "
@@ -93,8 +97,8 @@ function s:bookmarkHere(word)
     return
   endif
   let item = {
-        \   'word' : (a:word =~ '\S' ? substitute(a:word, '\n', ' ', 'g')
-        \                            : pathshorten(expand('%:p:~')) . '|' . line('.') . '| ' . getline('.')),
+        \   'word' : (a:word =~# '\S' ? substitute(a:word, '\n', ' ', 'g')
+        \                             : pathshorten(expand('%:p:~')) . '|' . line('.') . '| ' . getline('.')),
         \   'path' : expand('%:p'),
         \   'lnum' : line('.'),
         \   'pattern' : s:getLinePattern(line('.')),
@@ -108,6 +112,16 @@ function s:bookmarkHere(word)
   let info = fuf#loadInfoFile(s:MODE_NAME)
   call insert(info.data, item)
   call fuf#saveInfoFile(s:MODE_NAME, info)
+endfunction
+
+"
+function s:findItem(items, word)
+  for item in a:items
+    if item.word ==# a:word
+      return item
+    endif
+  endfor
+  return {}
 endfunction
 
 " }}}1
@@ -127,30 +141,50 @@ function s:handler.getPrompt()
 endfunction
 
 "
+function s:handler.getPreviewHeight()
+  return g:fuf_previewHeight
+endfunction
+
+"
 function s:handler.targetsPath()
   return 0
 endfunction
 
 "
-function s:handler.onComplete(patternSet)
-  return fuf#filterMatchesAndMapToSetRanks(
-        \ self.items, a:patternSet, self.getFilteredStats(a:patternSet.raw))
+function s:handler.makePatternSet(patternBase)
+  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForNonPath',
+        \                   self.partialMatching)
 endfunction
 
 "
-function s:handler.onOpen(expr, mode)
+function s:handler.makePreviewLines(word, count)
+  let item = s:findItem(self.info.data, a:word)
+  let lines = fuf#getFileLines(item.path)
+  if empty(lines)
+    return []
+  endif
+  let index = s:getMatchingLineNumber(lines, item.pattern, item.lnum) - 1
+  return fuf#makePreviewLinesAround(
+        \ lines, [index], a:count, self.getPreviewHeight())
+endfunction
+
+"
+function s:handler.getCompleteItems(patternPrimary)
+  return self.items
+endfunction
+
+"
+function s:handler.onOpen(word, mode)
   if a:mode == s:OPEN_TYPE_DELETE
-    call filter(self.info.data, 'v:val.word !=# a:expr')
+    call filter(self.info.data, 'v:val.word !=# a:word')
     call fuf#saveInfoFile(s:MODE_NAME, self.info)
     call fuf#launch(s:MODE_NAME, self.lastPattern, self.partialMatching)
     return
-  elseif
-    for item in self.info.data
-      if item.word ==# a:expr
+  else
+    let item = s:findItem(self.info.data, a:word)
+    if !empty(item)
         call s:jumpToBookmark(item.path, a:mode, item.pattern, item.lnum)
-        break
-      endif
-    endfor
+    endif
   endif
 endfunction
 
