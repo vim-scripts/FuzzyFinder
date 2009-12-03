@@ -84,7 +84,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_file_prompt
+  return fuf#formatPrompt(g:fuf_file_prompt, self.partialMatching)
 endfunction
 
 "
@@ -99,13 +99,13 @@ endfunction
 
 "
 function s:handler.makePatternSet(patternBase)
-  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForPathTail',
+  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForPathTail',
         \                   self.partialMatching)
 endfunction
 
 "
 function s:handler.makePreviewLines(word, count)
-  return fuf#makePreviewLinesForFile(a:word, count, self.getPreviewHeight())
+  return fuf#makePreviewLinesForFile(a:word, a:count, self.getPreviewHeight())
 endfunction
 
 "

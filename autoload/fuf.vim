@@ -13,6 +13,12 @@ let g:loaded_autoload_fuf = 1
 "=============================================================================
 " GLOBAL FUNCTIONS {{{1
 
+
+
+function fuf#getPathSeparator()
+  return (!&shellslash && (has('win32') || has('win64')) ? '\' : '/')
+endfunction
+
 " Removes duplicates
 " this function doesn't change list of argument.
 function fuf#unique(items)
@@ -59,6 +65,11 @@ function fuf#filterWithLimit(items, expr, limit)
 endfunction
 
 "
+function fuf#countModifiedFiles(files, time)
+  return len(filter(copy(a:files), 'getftime(v:val) > a:time'))
+endfunction
+
+"
 function fuf#getCurrentTagFiles()
   return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
 endfunction
@@ -98,7 +109,27 @@ endfunction
 " "foo/.../bar/...hoge" -> "foo/.../bar/../../hoge"
 function fuf#expandTailDotSequenceToParentDir(pattern)
   return substitute(a:pattern, '^\(.*[/\\]\)\?\zs\.\(\.\+\)\ze[^/\\]*$',
-        \           '\=repeat(".." . s:PATH_SEPARATOR, len(submatch(2)))', '')
+        \           '\=repeat(".." . fuf#getPathSeparator(), len(submatch(2)))', '')
+endfunction
+
+"
+function fuf#hash224(str)
+  let a = 0x00000800 " shift 11 bit 
+  let b = 0x001fffff " extract 11 bit
+  let nHash = 7
+  let hashes = repeat([0], nHash)
+  for i in range(len(a:str))
+    let iHash = i % nHash
+    let hashes[iHash] = hashes[iHash] * a + hashes[iHash] / b
+    let hashes[iHash] += char2nr(a:str[i])
+  endfor
+  return join(map(hashes, 'printf("%08x", v:val)'), '')
+endfunction
+
+"
+function fuf#formatPrompt(prompt, partialMatching)
+  let indicator = (a:partialMatching ? '!' : '')
+  return substitute(a:prompt, '[]', indicator, 'g')
 endfunction
 
 "
@@ -208,6 +239,16 @@ function fuf#openTag(tag, mode)
 endfunction
 
 "
+function fuf#openHelp(tag, mode)
+  execute {
+        \   s:OPEN_TYPE_CURRENT : 'help '         ,
+        \   s:OPEN_TYPE_SPLIT   : 'help '         ,
+        \   s:OPEN_TYPE_VSPLIT  : 'vertical help ',
+        \   s:OPEN_TYPE_TAB     : 'tab help '   ,
+        \ }[a:mode] . a:tag
+endfunction
+
+"
 function fuf#prejump(mode)
   execute {
         \   s:OPEN_TYPE_CURRENT : ''         ,
@@ -235,7 +276,7 @@ endfunction
 function fuf#makePathItem(fname, menu, appendsDirSuffix)
   let pathPair = fuf#splitPath(a:fname)
   let dirSuffix = (a:appendsDirSuffix && isdirectory(a:fname)
-        \          ? s:PATH_SEPARATOR
+        \          ? fuf#getPathSeparator()
         \          : '')
   return {
         \   'word'              : a:fname . dirSuffix,
@@ -262,64 +303,60 @@ function fuf#makeNonPathItem(word, menu)
 endfunction
 
 "
-function s:parsePrimaryPatternForPathTail(pattern)
+function s:interpretPrimaryPatternForPathTail(pattern)
   let pattern = fuf#expandTailDotSequenceToParentDir(a:pattern)
-  let pair = fuf#splitPath(pattern)
-  return [
-        \   pattern,
-        \   pair.tail,
-        \   [
-        \     ['v:val.wordForPrimaryTail', pair.tail],
-        \   ],
-        \ ]
+  let pairL = fuf#splitPath(s:toLowerForIgnoringCase(pattern))
+  return {
+        \   'primary'       : pattern,
+        \   'primaryForRank': pairL.tail,
+        \   'matchingPairs' : [['v:val.wordForPrimaryTail', pairL.tail],],
+        \ }
 endfunction
 
 "
-function s:parsePrimaryPatternForPath(pattern)
+function s:interpretPrimaryPatternForPath(pattern)
   let pattern = fuf#expandTailDotSequenceToParentDir(a:pattern)
-  let pair = fuf#splitPath(pattern)
+  let patternL = s:toLowerForIgnoringCase(pattern)
+  let pairL = fuf#splitPath(patternL)
   if g:fuf_splitPathMatching
     let matches = [
-        \     ['v:val.wordForPrimaryHead', pair.head],
-        \     ['v:val.wordForPrimaryTail', pair.tail],
+        \     ['v:val.wordForPrimaryHead', pairL.head],
+        \     ['v:val.wordForPrimaryTail', pairL.tail],
         \   ]
   else
     let matches = [
-          \     ['v:val.wordForPrimaryHead . v:val.wordForPrimaryTail', pattern],
+          \     ['v:val.wordForPrimaryHead . v:val.wordForPrimaryTail', patternL],
           \   ]
   endif
-  return [
-        \   pattern,
-        \   pair.tail,
-        \   matches,
-        \ ]
+  return {
+        \   'primary'       : pattern,
+        \   'primaryForRank': pairL.tail,
+        \   'matchingPairs' : matches,
+        \ }
 endfunction
 
 "
-function s:parsePrimaryPatternForNonPath(pattern)
-  return [
-        \   a:pattern,
-        \   a:pattern,
-        \   [
-        \     ['v:val.wordForPrimary', a:pattern],
-        \   ],
-        \ ]
+function s:interpretPrimaryPatternForNonPath(pattern)
+  let patternL = s:toLowerForIgnoringCase(a:pattern)
+  return {
+        \   'primary'       : a:pattern,
+        \   'primaryForRank': patternL,
+        \   'matchingPairs' : [['v:val.wordForPrimary', patternL],],
+        \ }
 endfunction
 
 "
-function fuf#makePatternSet(patternBase, parser, partialMatching)
+function fuf#makePatternSet(patternBase, interpreter, partialMatching)
   let MakeMatchingExpr = function(a:partialMatching
         \                         ? 's:makePartialMatchingExpr'
         \                         : 's:makeFuzzyMatchingExpr')
-  let [primary; refinings] =
-        \ split(s:toLowerForIgnoringCase(a:patternBase),
-        \       g:fuf_patternSeparator, 1)
-  let [primary, primaryForRank, matchingPairs] = call(a:parser, [primary])
-  let primaryExprs  = map(matchingPairs, 'MakeMatchingExpr(v:val[0], v:val[1])')
+  let [primary; refinings] = split(a:patternBase, g:fuf_patternSeparator, 1)
+  let elements = call(a:interpreter, [primary])
+  let primaryExprs  = map(elements.matchingPairs, 'MakeMatchingExpr(v:val[0], v:val[1])')
   let refiningExprs = map(refinings, 's:makeRefiningExpr(v:val)')
   return  {
-        \   'primary'       : primary,
-        \   'primaryForRank': primaryForRank,
+        \   'primary'       : elements.primary,
+        \   'primaryForRank': elements.primaryForRank,
         \   'filteringExpr' : join(primaryExprs + refiningExprs, ' && '),
         \ }
 endfunction
@@ -350,10 +387,13 @@ function fuf#mapToSetAbbrWithSnippedWordAsPath(items)
 endfunction
 
 "
-function fuf#setAbbrWithFormattedWord(item)
+function fuf#setAbbrWithFormattedWord(item, abbrIndex)
   let lenMenu = (exists('a:item.menu') ? len(a:item.menu) + 2 : 0)
   let abbrPrefix = (exists('a:item.abbrPrefix') ? a:item.abbrPrefix : '')
-  let a:item.abbr = printf('%4d: ', a:item.index) . abbrPrefix . a:item.word
+  let a:item.abbr = abbrPrefix . a:item.word
+  if a:abbrIndex
+    let a:item.abbr = printf('%4d: ', a:item.index) . a:item.abbr
+  endif
   let a:item.abbr = s:snipTail(a:item.abbr, g:fuf_maxMenuWidth - lenMenu, s:ABBR_SNIP_MASK)
   return a:item
 endfunction
@@ -394,25 +434,24 @@ function fuf#launch(modeName, initialPattern, partialMatching)
           \ 'cmdheight', s:runningHandler.getPreviewHeight() + 1)
   endif
   call s:activateFufBuffer()
-  " local autocommands
   augroup FufLocal
     autocmd!
     autocmd CursorMovedI <buffer>        call s:runningHandler.onCursorMovedI()
     autocmd InsertLeave  <buffer> nested call s:runningHandler.onInsertLeave()
   augroup END
-  " local mapping
   for [key, func] in [
-        \   [ g:fuf_keyOpen       , 'onCr(' . s:OPEN_TYPE_CURRENT . ', 0)' ],
-        \   [ g:fuf_keyOpenSplit  , 'onCr(' . s:OPEN_TYPE_SPLIT   . ', 0)' ],
-        \   [ g:fuf_keyOpenVsplit , 'onCr(' . s:OPEN_TYPE_VSPLIT  . ', 0)' ],
-        \   [ g:fuf_keyOpenTabpage, 'onCr(' . s:OPEN_TYPE_TAB     . ', 0)' ],
-        \   [ '<BS>'              , 'onBs()'                               ],
-        \   [ '<C-h>'             , 'onBs()'                               ],
-        \   [ g:fuf_keyPreview    , 'onPreviewBase()'                      ],
-        \   [ g:fuf_keyNextMode   , 'onSwitchMode(+1)'                     ],
-        \   [ g:fuf_keyPrevMode   , 'onSwitchMode(-1)'                     ],
-        \   [ g:fuf_keyPrevPattern, 'onRecallPattern(+1)'                  ],
-        \   [ g:fuf_keyNextPattern, 'onRecallPattern(-1)'                  ],
+        \   [ g:fuf_keyOpen          , 'onCr(' . s:OPEN_TYPE_CURRENT . ', 0)' ],
+        \   [ g:fuf_keyOpenSplit     , 'onCr(' . s:OPEN_TYPE_SPLIT   . ', 0)' ],
+        \   [ g:fuf_keyOpenVsplit    , 'onCr(' . s:OPEN_TYPE_VSPLIT  . ', 0)' ],
+        \   [ g:fuf_keyOpenTabpage   , 'onCr(' . s:OPEN_TYPE_TAB     . ', 0)' ],
+        \   [ '<BS>'                 , 'onBs()'                               ],
+        \   [ '<C-h>'                , 'onBs()'                               ],
+        \   [ g:fuf_keyPreview       , 'onPreviewBase()'                      ],
+        \   [ g:fuf_keyNextMode      , 'onSwitchMode(+1)'                     ],
+        \   [ g:fuf_keyPrevMode      , 'onSwitchMode(-1)'                     ],
+        \   [ g:fuf_keySwitchMatching, 'onSwitchMatching()'                   ],
+        \   [ g:fuf_keyPrevPattern   , 'onRecallPattern(+1)'                  ],
+        \   [ g:fuf_keyNextPattern   , 'onRecallPattern(-1)'                  ],
         \ ]
     call fuf#defineKeyMappingInHandler(key, func)
   endfor
@@ -490,7 +529,6 @@ endfunction
 " LOCAL FUNCTIONS/VARIABLES {{{1
 
 let s:INFO_FILE_VERSION_LINE = "VERSION\t300"
-let s:PATH_SEPARATOR = (!&shellslash && (has('win32') || has('win64')) ? '\' : '/')
 let s:ABBR_SNIP_MASK = '...'
 let s:OPEN_TYPE_CURRENT = 1
 let s:OPEN_TYPE_SPLIT   = 2
@@ -1072,6 +1110,15 @@ function s:handlerBase.onSwitchMode(shift)
     endif
   endfor
   call feedkeys("\<Esc>", 'n') " stopinsert doesn't work.
+endfunction
+
+"
+function s:handlerBase.onSwitchMatching()
+  let self.partialMatching = !self.partialMatching
+  let self.lastCol = -1
+  call setline('.', self.restorePrompt(self.lastPattern))
+  call feedkeys("\<End>", 'n')
+  "call self.onCursorMovedI()
 endfunction
 
 "

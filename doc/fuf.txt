@@ -52,7 +52,9 @@ FuzzyFinder can search:
         - files which are included in current tagfiles
         - jump list
         - change list
+        - buffer lines
         - quickfix
+        - help
 
 FuzzyFinder also provides APIs to use its system of searching files or
 selecting items.
@@ -97,6 +99,8 @@ You can launch FuzzyFinder by following commands:
         |:FufJumpList|   - Jump-List mode (|fuf-jumplist-mode|)
         |:FufChangeList| - Change-List mode (|fuf-changelist-mode|)
         |:FufQuickfix|   - Quickfix mode (|fuf-quickfix-mode|)
+        |:FufLine|       - Line mode (|fuf-line-mode|)
+        |:FufHelp|       - Help mode (|fuf-help-mode|)
 
 It is recommended to map these commands.
 
@@ -124,6 +128,9 @@ You can open a selected item in various ways:
         <C-l> (|g:fuf_keyOpenTabpage|) - opens in a new tab page.
 
 To cancel and return to previous window, just leave Insert mode.
+
+With <C-\><C-\> (|g:fuf_keySwitchMatching|), You can switch search method
+between fuzzy matching and partial matching.
 
 With <C-t> (|g:fuf_keyNextMode|) and <C-y> (|g:fuf_keyPrevMode|), You can
 switch current mode without leaving Insert mode .
@@ -177,7 +184,7 @@ This mode is set to disable in |g:fuf_modesDisable| by default because mapping
 Bookmark mode ~
 
 This mode provides an interface to select one of the bookmarks you have added
-beforehand and jump to the line of the bookmark.
+beforehand and jump there.
 
 You can add a cursor line to bookmarks by |:FufAddBookmark| command.
 Execute that command and you will be prompted to enter a bookmark name.
@@ -213,19 +220,31 @@ in current tagfiles and open it.
 Jump-List mode ~
 
 This mode provides an interface to select one from the |jumplist| of the
-current window and jump to the position.
+current window and jump there.
 
                                                          *fuf-changelist-mode*
 Change-List mode ~
 
 This mode provides an interface to select one from the |changelist| of the
-current buffer and jump to the position.
+current buffer and jump there.
 
                                                            *fuf-quickfix-mode*
 Quickfix mode ~
 
 This mode provides an interface to select one from the |quickfix| list and
-jump to the position.
+jump there.
+
+                                                               *fuf-line-mode*
+Line mode ~
+
+This mode provides an interface to select a line from current buffer and jump
+there.
+
+                                                               *fuf-help-mode*
+Help mode ~
+
+This mode provides an interface to select a help tag and jump to the help
+page.
 
                                                           *fuf-givenfile-mode*
 Given-File mode ~
@@ -239,7 +258,7 @@ API function:
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialMatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable partial matching instead of
                           fuzzy matching.
         prompt          - Prompt string
         items           - List of items.
@@ -263,7 +282,7 @@ API function:
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialMatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable partial matching instead of
                           fuzzy matching.
         prompt          - Prompt string
         items           - List of items.
@@ -290,7 +309,7 @@ API function:
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialMatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable partial matching instead of
                           fuzzy matching.
         prompt          - Prompt string
         items           - List of items.
@@ -324,7 +343,7 @@ API function:
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialMatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable partial matching instead of
                           fuzzy matching.
         prompt          - Prompt string.
         exclude         - Regexp pattern for items which you want to exclude
@@ -368,7 +387,7 @@ API function:
 <
         initialPattern  - String which is inserted after launching
                           FuzzyFinder.
-        partialMatching - If non-zero, enable a partial matching instead of a
+        partialMatching - If non-zero, enable partial matching instead of
                           fuzzy matching.
         prompt          - Prompt string
         listener        - |Dictionary| which has 'onComplete' and 'onAbort'.
@@ -670,6 +689,24 @@ See also: |fuf-vimrc-example|
 
         {pattern} will be inserted after launching FuzzyFinder.
 
+                                                                    *:FufLine*
+:FufLine[!] [{pattern}]
+        Launchs Line mode.
+
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
+
+        {pattern} will be inserted after launching FuzzyFinder.
+
+                                                                    *:FufHelp*
+:FufHelp[!] [{pattern}]
+        Launchs Help mode.
+
+        If a command was executed with a ! modifier, it does partial matching
+        instead of fuzzy matching.
+
+        {pattern} will be inserted after launching FuzzyFinder.
+
                                                                 *:FufEditInfo*
 :FufEditInfo
         Opens a buffer for editing your information file. See
@@ -757,6 +794,11 @@ For All Modes ~
 <
         Key mapped to recall next entered patten from history.
 
+                                                  *g:fuf_keySwitchMatching*  >
+  let g:fuf_keySwitchMatching = '<C-\><C-\>'
+<
+        Key mapped to switch between fuzzy matching and partial matching.
+
                                                            *g:fuf_infoFile*  >
   let g:fuf_infoFile = '~/.vim-fuf'
 <
@@ -833,7 +875,7 @@ For All Modes ~
 <
         'cmdheight' is set to this when a mode supporting preview is launched.
         Information of selected completion item will be shown on command-line
-        area.
+        area. If zero, preview feature is disabled.
 
                                                           *g:fuf_useMigemo*  >
   let g:fuf_useMigemo = 0
@@ -844,9 +886,9 @@ For All Modes ~
 For Buffer Mode ~
 
                                                       *g:fuf_buffer_prompt*  >
-  let g:fuf_buffer_prompt = '>Buffer>'
+  let g:fuf_buffer_prompt = '>Buffer[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                  *g:fuf_buffer_switchOrder*  >
   let g:fuf_buffer_switchOrder = 10
@@ -863,9 +905,9 @@ For Buffer Mode ~
 For File Mode ~
 
                                                         *g:fuf_file_prompt*  >
-  let g:fuf_file_prompt = '>File>'
+  let g:fuf_file_prompt = '>File[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                    *g:fuf_file_switchOrder*  >
   let g:fuf_file_switchOrder = 20
@@ -874,7 +916,7 @@ For File Mode ~
         number, Fuzzyfinder never switches to this mode.
 
                                                        *g:fuf_file_exclude*  >
-  let g:fuf_file_exclude = '\v\~$|\.(o|exe|bak|swp)$|(^|[/\\])\.(hg|git|bzr)($|[/\\])'
+  let g:fuf_file_exclude = '\v\~$|\.(o|exe|dll|bak|swp)$|(^|[/\\])\.(hg|git|bzr)($|[/\\])'
 <
         Regexp pattern for items which you want to exclude from completion
         list.
@@ -883,9 +925,9 @@ For File Mode ~
 For Directory Mode ~
 
                                                          *g:fuf_dir_prompt*  >
-  let g:fuf_dir_prompt = '>Dir>'
+  let g:fuf_dir_prompt = '>Dir[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                     *g:fuf_dir_switchOrder*  >
   let g:fuf_dir_switchOrder = 30
@@ -903,9 +945,9 @@ For Directory Mode ~
 For Mru-File Mode ~
 
                                                      *g:fuf_mrufile_prompt*  >
-  let g:fuf_mrufile_prompt = '>Mru-File>'
+  let g:fuf_mrufile_prompt = '>Mru-File[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                 *g:fuf_mrufile_switchOrder*  >
   let g:fuf_mrufile_switchOrder = 40
@@ -928,9 +970,9 @@ For Mru-File Mode ~
 For Mru-Cmd Mode ~
 
                                                       *g:fuf_mrucmd_prompt*  >
-  let g:fuf_mrucmd_prompt = '>Mru-Cmd>'
+  let g:fuf_mrucmd_prompt = '>Mru-Cmd[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                  *g:fuf_mrucmd_switchOrder*  >
   let g:fuf_mrucmd_switchOrder = 50
@@ -953,9 +995,9 @@ For Mru-Cmd Mode ~
 For Bookmark Mode ~
 
                                                     *g:fuf_bookmark_prompt*  >
-  let g:fuf_bookmark_prompt = '>Bookmark>'
+  let g:fuf_bookmark_prompt = '>Bookmark[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                *g:fuf_bookmark_switchOrder*  >
   let g:fuf_bookmark_switchOrder = 60
@@ -978,9 +1020,9 @@ For Bookmark Mode ~
 For Tag Mode ~
 
                                                          *g:fuf_tag_prompt*  >
-  let g:fuf_tag_prompt = '>Tag>'
+  let g:fuf_tag_prompt = '>Tag[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                     *g:fuf_tag_switchOrder*  >
   let g:fuf_tag_switchOrder = 70
@@ -988,13 +1030,19 @@ For Tag Mode ~
         Number of order for switching to the next/previous mode. If negative
         number, Fuzzyfinder never switches to this mode.
 
+                                                      *g:fuf_tag_cache_dir*  >
+  let g:fuf_tag_cache_dir = '~/.vim-fuf-cache/tag'
+<
+        Cache files are created in this directory. If empty, they are not
+        created.
+
                                              *fuf-options-for-taggedfile-mode*
 For Tagged-File Mode ~
 
                                                   *g:fuf_taggedfile_prompt*  >
-  let g:fuf_taggedfile_prompt = '>Tagged-File>'
+  let g:fuf_taggedfile_prompt = '>Tagged-File[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                              *g:fuf_taggedfile_switchOrder*  >
   let g:fuf_taggedfile_switchOrder = 80
@@ -1002,13 +1050,19 @@ For Tagged-File Mode ~
         Number of order for switching to the next/previous mode. If negative
         number, Fuzzyfinder never switches to this mode.
 
+                                               *g:fuf_taggedfile_cache_dir*  >
+  let g:fuf_taggedfile_cache_dir = '~/.vim-fuf-cache/taggedfile'
+<
+        Cache files are created in this directory. If empty, they are not
+        created.
+
                                                *fuf-options-for-jumplist-mode*
 For Jump-List Mode ~
 
                                                     *g:fuf_jumplist_prompt*  >
-  let g:fuf_jumplist_prompt = '>Jump-List>'
+  let g:fuf_jumplist_prompt = '>Jump-List[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                                *g:fuf_jumplist_switchOrder*  >
   let g:fuf_jumplist_switchOrder = 90
@@ -1020,9 +1074,9 @@ For Jump-List Mode ~
 For Change-List Mode ~
 
                                                   *g:fuf_changelist_prompt*  >
-  let g:fuf_changelist_prompt = '>Change-List>'
+  let g:fuf_changelist_prompt = '>Change-List[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                              *g:fuf_changelist_switchOrder*  >
   let g:fuf_changelist_switchOrder = 100
@@ -1034,15 +1088,49 @@ For Change-List Mode ~
 For Quickfix Mode ~
 
                                                   *g:fuf_quickfix_prompt*  >
-  let g:fuf_quickfix_prompt = '>Quickfix>'
+  let g:fuf_quickfix_prompt = '>Quickfix[]>'
 <
-        Prompt string.
+        Prompt string. "[]" will be substituted with indicators.
 
                                              *g:fuf_quickfix_switchOrder*  >
   let g:fuf_quickfix_switchOrder = 110
 <
         Number of order for switching to the next/previous mode. If negative
         number, Fuzzyfinder never switches to this mode.
+
+                                                   *fuf-options-for-line-mode*
+For Line Mode ~
+
+                                                        *g:fuf_line_prompt*  >
+  let g:fuf_line_prompt = '>Line[]>'
+<
+        Prompt string. "[]" will be substituted with indicators.
+
+                                                   *g:fuf_line_switchOrder*  >
+  let g:fuf_line_switchOrder = 120
+<
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
+
+                                                   *fuf-options-for-help-mode*
+For Help Mode ~
+
+                                                        *g:fuf_help_prompt*  >
+  let g:fuf_help_prompt = '>Help[]>'
+<
+        Prompt string. "[]" will be substituted with indicators.
+
+                                                   *g:fuf_help_switchOrder*  >
+  let g:fuf_help_switchOrder = 130
+<
+        Number of order for switching to the next/previous mode. If negative
+        number, Fuzzyfinder never switches to this mode.
+
+                                                     *g:fuf_help_cache_dir*  >
+  let g:fuf_help_cache_dir = '~/.vim-fuf-cache/help'
+<
+        Cache files are created in this directory. If empty, they are not
+        created.
 
 
 ==============================================================================
@@ -1073,6 +1161,8 @@ VIMRC EXAMPLE                                              *fuf-vimrc-example*
   nnoremap <silent> <C-f><C-j> :FufJumpList<CR>
   nnoremap <silent> <C-f><C-g> :FufChangeList<CR>
   nnoremap <silent> <C-f><C-q> :FufQuickfix<CR>
+  nnoremap <silent> <C-f><C-l> :FufLine<CR>
+  nnoremap <silent> <C-f><C-h> :FufHelp<CR>
   nnoremap <silent> <C-f><C-b> :FufAddBookmark<CR>
   vnoremap <silent> <C-f><C-b> :FufAddBookmarkAsSelectedText<CR>
   nnoremap <silent> <C-f><C-e> :FufEditInfo<CR>
@@ -1092,6 +1182,17 @@ SPECIAL THANKS                                                    *fuf-thanks*
 
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
+
+3.5:
+  - Added Line mode.
+  - Added Help mode.
+  - Added key mapping to switch between fuzzy matching and partial matching.
+  - Changed the default values of g:fuf_file_exclude for ignoring "*.dll".
+  - Changed Tag mode and Tagged-File mode to cache parsed data to files in
+    "~/.vim-fuf-cache/".
+  - Fixed a bug that repeating preview key produced no effect.
+  - Fixed a bug that File mode and Directory mode didn't list items in a
+    directory whose name includes uppercase characters. (Thanks, ryo7000)
 
 3.4:
   - Added new feature which makes it possible to preview selected completion

@@ -100,7 +100,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_mrufile_prompt
+  return fuf#formatPrompt(g:fuf_mrufile_prompt, self.partialMatching)
 endfunction
 
 "
@@ -115,13 +115,13 @@ endfunction
 
 "
 function s:handler.makePatternSet(patternBase)
-  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForPath',
+  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForPath',
         \                   self.partialMatching)
 endfunction
 
 "
 function s:handler.makePreviewLines(word, count)
-  return fuf#makePreviewLinesForFile(a:word, count, self.getPreviewHeight())
+  return fuf#makePreviewLinesForFile(a:word, a:count, self.getPreviewHeight())
 endfunction
 
 "

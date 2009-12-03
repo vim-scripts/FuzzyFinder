@@ -91,7 +91,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_changelist_prompt
+  return fuf#formatPrompt(g:fuf_changelist_prompt, self.partialMatching)
 endfunction
 
 "
@@ -106,7 +106,7 @@ endfunction
 
 "
 function s:handler.makePatternSet(patternBase)
-  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForNonPath',
+  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForNonPath',
         \                   self.partialMatching)
 endfunction
 
@@ -155,7 +155,7 @@ function s:handler.onModeEnterPost()
   call filter(self.items, '!empty(v:val)')
   call reverse(self.items)
   call fuf#mapToSetSerialIndex(self.items, 1)
-  call map(self.items, 'fuf#setAbbrWithFormattedWord(v:val)')
+  call map(self.items, 'fuf#setAbbrWithFormattedWord(v:val, 1)')
 endfunction
 
 "

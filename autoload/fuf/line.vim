@@ -4,46 +4,37 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if exists('g:loaded_autoload_fuf_givendir') || v:version < 702
+if exists('g:loaded_autoload_fuf_line') || v:version < 702
   finish
 endif
-let g:loaded_autoload_fuf_givendir = 1
+let g:loaded_autoload_fuf_line = 1
 
 " }}}1
 "=============================================================================
 " GLOBAL FUNCTIONS {{{1
 
 "
-function fuf#givendir#createHandler(base)
+function fuf#line#createHandler(base)
   return a:base.concretize(copy(s:handler))
 endfunction
 
 "
-function fuf#givendir#getSwitchOrder()
-  return -1
+function fuf#line#getSwitchOrder()
+  return g:fuf_line_switchOrder
 endfunction
 
 "
-function fuf#givendir#renewCache()
+function fuf#line#renewCache()
 endfunction
 
 "
-function fuf#givendir#requiresOnCommandPre()
+function fuf#line#requiresOnCommandPre()
   return 0
 endfunction
 
 "
-function fuf#givendir#onInit()
-endfunction
-
-"
-function fuf#givendir#launch(initialPattern, partialMatching, prompt, items)
-  let s:prompt = (empty(a:prompt) ? '>' : a:prompt)
-  let s:items = map(copy(a:items), 'substitute(v:val, ''[/\\]\?$'', "", "")')
-  let s:items = map(s:items, 'fuf#makePathItem(v:val, "", 0)')
-  call fuf#mapToSetSerialIndex(s:items, 1)
-  call fuf#mapToSetAbbrWithSnippedWordAsPath(s:items)
-  call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
+function fuf#line#onInit()
+  call fuf#defineLaunchCommand('FufLine', s:MODE_NAME, '""')
 endfunction
 
 " }}}1
@@ -51,6 +42,7 @@ endfunction
 " LOCAL FUNCTIONS/VARIABLES {{{1
 
 let s:MODE_NAME = expand('<sfile>:t:r')
+let s:OPEN_TYPE_DELETE = -1
 
 " }}}1
 "=============================================================================
@@ -65,7 +57,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return fuf#formatPrompt(s:prompt, self.partialMatching)
+  return fuf#formatPrompt(g:fuf_line_prompt, self.partialMatching)
 endfunction
 
 "
@@ -75,31 +67,41 @@ endfunction
 
 "
 function s:handler.targetsPath()
-  return 1
+  return 0
 endfunction
 
 "
 function s:handler.makePatternSet(patternBase)
-  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForPath',
+  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForNonPath',
         \                   self.partialMatching)
 endfunction
 
 "
 function s:handler.makePreviewLines(word, count)
+  let items = filter(copy(self.items), 'v:val.word ==# a:word')
+  if empty(items)
+    return []
+  endif
+  let lines = fuf#getFileLines(self.bufNrPrev)
   return fuf#makePreviewLinesAround(
-        \ split(glob(fnamemodify(a:word, ':p') . '*'), "\n"),
-        \ [], a:count, self.getPreviewHeight())
-  return 
+        \ lines, [items[0].index - 1], a:count, self.getPreviewHeight())
 endfunction
 
 "
 function s:handler.getCompleteItems(patternPrimary)
-  return s:items
+  return self.items
 endfunction
 
 "
 function s:handler.onOpen(word, mode)
-  execute ':cd ' . fnameescape(a:word)
+  call fuf#prejump(a:mode)
+  call filter(self.items, 'v:val.word ==# a:word')
+  if empty(self.items)
+    return
+    execute 'cc ' . self.items[0].index
+  endif
+  call cursor(self.items[0].index, 0)
+  normal! zvzz
 endfunction
 
 "
@@ -108,6 +110,16 @@ endfunction
 
 "
 function s:handler.onModeEnterPost()
+  let tab = repeat(' ', getbufvar(self.bufNrPrev, '&tabstop'))
+  let self.items = getbufline(self.bufNrPrev, 1, '$')
+  let lnumFormat = '%' . len(string(len(self.items) + 1)) . 'd|'
+  for i in range(len(self.items))
+    let self.items[i] = printf(lnumFormat, i + 1)
+          \ . substitute(self.items[i], "\t", tab, 'g')
+  endfor
+  call map(self.items, 'fuf#makeNonPathItem(v:val, "")')
+  call fuf#mapToSetSerialIndex(self.items, 1)
+  call map(self.items, 'fuf#setAbbrWithFormattedWord(v:val, 0)')
 endfunction
 
 "

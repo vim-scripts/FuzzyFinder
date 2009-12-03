@@ -23,7 +23,7 @@ function s:initialize()
   call s:defineOption('g:fuf_modes'  , [
         \   'buffer', 'file', 'dir', 'mrufile', 'mrucmd',
         \   'bookmark', 'tag', 'taggedfile',
-        \   'jumplist', 'changelist', 'quickfix',
+        \   'jumplist', 'changelist', 'quickfix', 'line', 'help',
         \   'givenfile', 'givendir', 'givencmd',
         \   'callbackfile', 'callbackitem',
         \ ])
@@ -37,6 +37,7 @@ function s:initialize()
   call s:defineOption('g:fuf_keyPrevMode'      , '<C-y>')
   call s:defineOption('g:fuf_keyPrevPattern'   , '<C-s>')
   call s:defineOption('g:fuf_keyNextPattern'   , '<C-_>')
+  call s:defineOption('g:fuf_keySwitchMatching', '<C-\><C-\>')
   call s:defineOption('g:fuf_infoFile'         , '~/.vim-fuf')
   call s:defineOption('g:fuf_abbrevMap'        , {})
   call s:defineOption('g:fuf_patternSeparator' , ';')
@@ -52,47 +53,56 @@ function s:initialize()
   call s:defineOption('g:fuf_previewHeight'    , 10)
   call s:defineOption('g:fuf_useMigemo'        , 0)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_buffer_prompt'     , '>Buffer>')
+  call s:defineOption('g:fuf_buffer_prompt'     , '>Buffer[]>')
   call s:defineOption('g:fuf_buffer_switchOrder', 10)
   call s:defineOption('g:fuf_buffer_mruOrder'   , 1)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_file_prompt'     , '>File>')
+  call s:defineOption('g:fuf_file_prompt'     , '>File[]>')
   call s:defineOption('g:fuf_file_switchOrder', 20)
-  call s:defineOption('g:fuf_file_exclude'    , '\v\~$|\.(o|exe|bak|sw[po])$|(^|[/\\])\.(hg|git|bzr)($|[/\\])')
+  call s:defineOption('g:fuf_file_exclude'    , '\v\~$|\.(o|exe|dll|bak|sw[po])$|(^|[/\\])\.(hg|git|bzr)($|[/\\])')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_dir_prompt'     , '>Dir>')
+  call s:defineOption('g:fuf_dir_prompt'     , '>Dir[]>')
   call s:defineOption('g:fuf_dir_switchOrder', 30)
   call s:defineOption('g:fuf_dir_exclude'    , '\v(^|[/\\])\.(hg|git|bzr)($|[/\\])')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_mrufile_prompt'     , '>Mru-File>')
+  call s:defineOption('g:fuf_mrufile_prompt'     , '>Mru-File[]>')
   call s:defineOption('g:fuf_mrufile_switchOrder', 40)
   call s:defineOption('g:fuf_mrufile_exclude'    , '\v\~$|\.(bak|sw[po])$|^(\/\/|\\\\|\/mnt\/|\/media\/)')
   call s:defineOption('g:fuf_mrufile_maxItem'    , 200)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_mrucmd_prompt'     , '>Mru-Cmd>')
+  call s:defineOption('g:fuf_mrucmd_prompt'     , '>Mru-Cmd[]>')
   call s:defineOption('g:fuf_mrucmd_switchOrder', 50)
   call s:defineOption('g:fuf_mrucmd_exclude'    , '^$')
   call s:defineOption('g:fuf_mrucmd_maxItem'    , 200)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_bookmark_prompt'     , '>Bookmark>')
+  call s:defineOption('g:fuf_bookmark_prompt'     , '>Bookmark[]>')
   call s:defineOption('g:fuf_bookmark_switchOrder', 60)
   call s:defineOption('g:fuf_bookmark_searchRange', 400)
   call s:defineOption('g:fuf_bookmark_keyDelete'  , '<C-]>')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_tag_prompt'     , '>Tag>')
+  call s:defineOption('g:fuf_tag_prompt'     , '>Tag[]>')
   call s:defineOption('g:fuf_tag_switchOrder', 70)
+  call s:defineOption('g:fuf_tag_cache_dir'  , '~/.vim-fuf-cache/tag')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_taggedfile_prompt'     , '>Tagged-File>')
+  call s:defineOption('g:fuf_taggedfile_prompt'     , '>Tagged-File[]>')
   call s:defineOption('g:fuf_taggedfile_switchOrder', 80)
+  call s:defineOption('g:fuf_taggedfile_cache_dir'  , '~/.vim-fuf-cache/taggedfile')
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_jumplist_prompt'     , '>Jump-List>')
+  call s:defineOption('g:fuf_jumplist_prompt'     , '>Jump-List[]>')
   call s:defineOption('g:fuf_jumplist_switchOrder', 90)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_changelist_prompt'     , '>Change-List>')
+  call s:defineOption('g:fuf_changelist_prompt'     , '>Change-List[]>')
   call s:defineOption('g:fuf_changelist_switchOrder', 100)
   "---------------------------------------------------------------------------
-  call s:defineOption('g:fuf_quickfix_prompt'     , '>Quickfix>')
+  call s:defineOption('g:fuf_quickfix_prompt'     , '>Quickfix[]>')
   call s:defineOption('g:fuf_quickfix_switchOrder', 110)
+  "---------------------------------------------------------------------------
+  call s:defineOption('g:fuf_line_prompt'     , '>Line[]>')
+  call s:defineOption('g:fuf_line_switchOrder', 120)
+  "---------------------------------------------------------------------------
+  call s:defineOption('g:fuf_help_prompt'     , '>Help[]>')
+  call s:defineOption('g:fuf_help_switchOrder', 130)
+  call s:defineOption('g:fuf_help_cache_dir'  , '~/.vim-fuf-cache/help')
   "---------------------------------------------------------------------------
   call filter(g:fuf_modes, 'count(g:fuf_modesDisable, v:val) == 0')
   for m in g:fuf_modes

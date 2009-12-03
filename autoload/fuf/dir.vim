@@ -74,7 +74,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return g:fuf_dir_prompt
+  return fuf#formatPrompt(g:fuf_dir_prompt, self.partialMatching)
 endfunction
 
 "
@@ -89,7 +89,7 @@ endfunction
 
 "
 function s:handler.makePatternSet(patternBase)
-  return fuf#makePatternSet(a:patternBase, 's:parsePrimaryPatternForPathTail',
+  return fuf#makePatternSet(a:patternBase, 's:interpretPrimaryPatternForPathTail',
         \                   self.partialMatching)
 endfunction
 

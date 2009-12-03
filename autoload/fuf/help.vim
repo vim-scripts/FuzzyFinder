@@ -4,39 +4,39 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if exists('g:loaded_autoload_fuf_tag') || v:version < 702
+if exists('g:loaded_autoload_fuf_help') || v:version < 702
   finish
 endif
-let g:loaded_autoload_fuf_tag = 1
+let g:loaded_autoload_fuf_help = 1
 
 " }}}1
 "=============================================================================
 " GLOBAL FUNCTIONS {{{1
 
 "
-function fuf#tag#createHandler(base)
+function fuf#help#createHandler(base)
   return a:base.concretize(copy(s:handler))
 endfunction
 
 "
-function fuf#tag#getSwitchOrder()
-  return g:fuf_tag_switchOrder
+function fuf#help#getSwitchOrder()
+  return g:fuf_help_switchOrder
 endfunction
 
 "
-function fuf#tag#renewCache()
+function fuf#help#renewCache()
   let s:cache = {}
 endfunction
 
 "
-function fuf#tag#requiresOnCommandPre()
+function fuf#help#requiresOnCommandPre()
   return 0
 endfunction
 
 "
-function fuf#tag#onInit()
-  call fuf#defineLaunchCommand('FufTag'              , s:MODE_NAME, '""')
-  call fuf#defineLaunchCommand('FufTagWithCursorWord', s:MODE_NAME, 'expand(''<cword>'')')
+function fuf#help#onInit()
+  call fuf#defineLaunchCommand('FufHelp'              , s:MODE_NAME, '""')
+  call fuf#defineLaunchCommand('FufHelpWithCursorWord', s:MODE_NAME, 'expand(''<cword>'')')
 endfunction
 
 " }}}1
@@ -46,36 +46,64 @@ endfunction
 let s:MODE_NAME = expand('<sfile>:t:r')
 
 "
-function s:getTagNames(tagFile)
-  let names = map(readfile(a:tagFile), 'matchstr(v:val, ''^[^!\t][^\t]*'')')
-  return filter(names, 'v:val =~# ''\S''')
+function s:getCurrentHelpTagFiles()
+  let prefix = 'doc' . fuf#getPathSeparator()
+  let tagFiles = split(globpath(&runtimepath, prefix . 'tags'   ), "\n")
+        \      + split(globpath(&runtimepath, prefix . 'tags-??'), "\n")
+  return sort(map(tagFiles, 'fnamemodify(v:val, ":p")'))
 endfunction
 
 "
-function s:parseTagFiles(tagFiles)
-  if !empty(g:fuf_tag_cache_dir)
-    if !isdirectory(expand(g:fuf_tag_cache_dir))
-      call mkdir(expand(g:fuf_tag_cache_dir), 'p')
+function s:parseHelpTagEntry(line, tagFile)
+  let elements = split(a:line, "\t")
+  if len(elements) != 3 || elements[0][0] ==# '!'
+    return {}
+  endif
+  let suffix = matchstr(a:tagFile, '-\zs..$')
+  if empty(suffix) 
+    let suffix = '@en'
+  else
+    let suffix = '@' . suffix
+  endif
+  let dir = fnamemodify(a:tagFile, ':h') . fuf#getPathSeparator()
+  return {
+        \   'word'   : elements[0] . suffix,
+        \   'path'   : dir . elements[1],
+        \   'pattern': elements[2][1:],
+        \ }
+endfunction
+
+"
+function s:getHelpTagEntries(tagFile)
+  let names = map(readfile(a:tagFile), 's:parseHelpTagEntry(v:val, a:tagFile)')
+  return filter(names, '!empty(v:val)')
+endfunction
+
+"
+function s:parseHelpTagFiles(tagFiles)
+  if !empty(g:fuf_help_cache_dir)
+    if !isdirectory(expand(g:fuf_help_cache_dir))
+      call mkdir(expand(g:fuf_help_cache_dir), 'p')
     endif
     " NOTE: fnamemodify('a/b', ':p') returns 'a/b/' if the directory exists.
-    let cacheFile = fnamemodify(g:fuf_tag_cache_dir, ':p')
+    let cacheFile = fnamemodify(g:fuf_help_cache_dir, ':p')
           \ . fuf#hash224(join(a:tagFiles, "\n"))
     if filereadable(cacheFile) && fuf#countModifiedFiles(a:tagFiles, getftime(cacheFile)) == 0
       return map(readfile(cacheFile), 'eval(v:val)')
     endif
   endif
-  let items = fuf#unique(fuf#concat(map(copy(a:tagFiles), 's:getTagNames(v:val)')))
-  let items = map(items, 'fuf#makeNonPathItem(v:val, "")')
+  let items = fuf#unique(fuf#concat(map(copy(a:tagFiles), 's:getHelpTagEntries(v:val)')))
+  let items = map(items, 'extend(v:val, fuf#makeNonPathItem(v:val.word, ""))')
   call fuf#mapToSetSerialIndex(items, 1)
   let items = map(items, 'fuf#setAbbrWithFormattedWord(v:val, 1)')
-  if !empty(g:fuf_tag_cache_dir)
+  if !empty(g:fuf_help_cache_dir)
     call writefile(map(copy(items), 'string(v:val)'), cacheFile)
   endif
   return items
 endfunction
 
 "
-function s:enumTags(tagFiles)
+function s:enumHelpTags(tagFiles)
   if !len(a:tagFiles)
     return []
   endif
@@ -83,23 +111,19 @@ function s:enumTags(tagFiles)
   if !exists('s:cache[key]') || fuf#countModifiedFiles(a:tagFiles, s:cache[key].time)
     let s:cache[key] = {
           \   'time'  : localtime(),
-          \   'items' : s:parseTagFiles(a:tagFiles)
+          \   'items' : s:parseHelpTagFiles(a:tagFiles)
           \ }
   endif
   return s:cache[key].items
 endfunction
 
 "
-function s:getMatchingIndex(lines, cmd)
-  if a:cmd !~# '\D'
-    return str2nr(a:cmd)
-  endif
-  let pattern = matchstr(a:cmd, '^\/\^\zs.*\ze\$\/$')
-  if empty(pattern)
+function s:getMatchingIndex(lines, pattern)
+  if empty(a:pattern)
     return -1
   endif
   for i in range(len(a:lines))
-    if a:lines[i] ==# pattern
+    if stridx(a:lines[i], a:pattern) >= 0
       return i
     endif
   endfor
@@ -119,7 +143,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return fuf#formatPrompt(g:fuf_tag_prompt, self.partialMatching)
+  return fuf#formatPrompt(g:fuf_help_prompt, self.partialMatching)
 endfunction
 
 "
@@ -138,43 +162,39 @@ function s:handler.makePatternSet(patternBase)
         \                   self.partialMatching)
 endfunction
 
-" 'cmd' is '/^hoge hoge$/' or line number
+"
 function s:handler.makePreviewLines(word, count)
-  let tags = taglist('^' . a:word . '$')
-  if empty(tags)
+  let items = filter(copy(s:enumHelpTags(self.tagFiles)), 'v:val.word ==# a:word')
+  if empty(items)
     return []
   endif
-  let i = a:count % len(tags)
-  let title = printf('(%d/%d) %s', i + 1, len(tags), tags[i].filename)
-  let lines = fuf#getFileLines(tags[i].filename)
-  let index = s:getMatchingIndex(lines, tags[i].cmd)
-  return [title] + fuf#makePreviewLinesAround(
-        \ lines, (index < 0 ? [] : [index]), 0, self.getPreviewHeight() - 1)
+  let lines = fuf#getFileLines(items[0].path)
+  let index = s:getMatchingIndex(lines, items[0].pattern)
+  return [items[0].path . ':'] + fuf#makePreviewLinesAround(
+        \ lines, (index < 0 ? [] : [index]), a:count, self.getPreviewHeight() - 1)
 endfunction
 
 "
 function s:handler.getCompleteItems(patternPrimary)
-  return s:enumTags(self.tagFiles)
+  return s:enumHelpTags(self.tagFiles)
 endfunction
 
 "
 function s:handler.onOpen(word, mode)
-  call fuf#openTag(a:word, a:mode)
+  call fuf#openHelp(a:word, a:mode)
 endfunction
 
 "
 function s:handler.onModeEnterPre()
-  let self.tagFiles = fuf#getCurrentTagFiles()
+  let self.tagFiles = s:getCurrentHelpTagFiles()
 endfunction
 
 "
 function s:handler.onModeEnterPost()
-  let &l:tags = join(self.tagFiles, ',')
 endfunction
 
 "
 function s:handler.onModeLeavePost(opened)
-  let &l:tags = ''
 endfunction
 
 " }}}1

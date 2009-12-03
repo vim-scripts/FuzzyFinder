@@ -49,6 +49,11 @@ FuzzyFinder が検索できる対象は次の通りです:
         - ブックマーク
         - タグ
         - タグファイルに含まれるファイル
+        - ジャンプリスト
+        - チェンジリスト
+        - バッファの行
+        - quickfix
+        - ヘルプ
 
 FuzzyFinder は ファイルを検索したりアイテムを選択するシステムを利用するための
 API も提供します。
@@ -92,6 +97,8 @@ ZIPファイルをランタイムディレクトリに展開します。
         |:FufJumpList|   - Jump-List モード (|fuf-jumplist-mode|)
         |:FufChangeList| - Change-List モード (|fuf-changelist-mode|)
         |:FufQuickfix|   - Quickfix モード (|fuf-quickfix-mode|)
+        |:FufLine|       - Line モード (|fuf-line-mode|)
+        |:FufHelp|       - Help モード (|fuf-help-mode|)
 
 これらのコマンドを押しやすいキーにマッピングすることを推奨します。
 
@@ -119,6 +126,9 @@ FuzzyFinder は入力されたパターンにマッチするアイテムを検�
         <C-l> (|g:fuf_keyOpenTabpage|) - 別のタブページで開きます。
 
 キャンセルして直前のウィンドウに戻るには、インサートモードを抜けてください。
+
+<C-\><C-\> (|g:fuf_keySwitchMatching|) で、検索方法をあいまいマッチングまたは
+部分一致マッチングに交互に切り替えることができます。
 
 <C-t> (|g:fuf_keyNextMode|) と <C-y> (|g:fuf_keyPrevMode|) で、インサートモー
 ドを抜けることなくカレントモードを切り替えることが出来ます。
@@ -210,11 +220,23 @@ Change-List モード ~
 このモードはカレントバッファの|changelist|から選択した位置へジャンプするインタ
 ーフェースを提供します。
 
-                                                         *fuf-quickfix-mode*
+                                                           *fuf-quickfix-mode*
 Quickfix モード ~
 
 このモードは|quickfix|リストから選択した位置へジャンプするインターフェースを提
 供します。
+
+                                                               *fuf-line-mode*
+Line モード ~
+
+このモードはカレントバッファの行を選択してジャンプするインターフェースを提供し
+ます。
+
+                                                               *fuf-help-mode*
+Help モード ~
+
+このモードはヘルプタグを選択してそのヘルプページへジャンプするインターフェース
+を提供します。
 
                                                           *fuf-givenfile-mode*
 Given-File モード ~
@@ -643,6 +665,24 @@ See also: |fuf-vimrc-example|
 
         FuzzyFinder 起動後に {pattern} が挿入されます。
 
+                                                                    *:FufLine*
+:FufLine [{pattern}]
+        Line モードを起動します。
+
+        ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
+        うになります。
+
+        FuzzyFinder 起動後に {pattern} が挿入されます。
+
+                                                                    *:FufHelp*
+:FufHelp[!] [{pattern}]
+        Help モードを起動します。
+
+        ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
+        うになります。
+
+        FuzzyFinder 起動後に {pattern} が挿入されます。
+
                                                                 *:FufEditInfo*
 :FufEditInfo
         情報ファイルを編集するためのバッファを開きます。詳しくは
@@ -697,6 +737,12 @@ See also: |fuf-vimrc-example|
 <
         補完を確定し、バッファ/ファイルを別タブページ開くキー。
 
+                                                         *g:fuf_keyPreview*  >
+  let g:fuf_keyPreview = '<C-@>'
+<
+        選択されている補完アイテムの情報をコマンドライン領域に表示するキー。プ
+        レビューをサポートするモードでのみ作用します。
+
                                                         *g:fuf_keyNextMode*  >
   let g:fuf_keyNextMode = '<C-t>'
 <
@@ -713,9 +759,14 @@ See also: |fuf-vimrc-example|
         履歴から前の入力パターンを呼び出すキー。
 
                                                      *g:fuf_keyNextPattern*  >
-  let g:fuf_keyNextPattern = '<C-^>'
+  let g:fuf_keyNextPattern = '<C-_>'
 <
         履歴から次の入力パターンを呼び出すキー。
+
+                                                  *g:fuf_keySwitchMatching*  >
+  let g:fuf_keySwitchMatching = '<C-\><C-\>'
+<
+        あいまいマッチングと部分一致マッチングを切り替えるキー。
 
                                                            *g:fuf_infoFile*  >
   let g:fuf_infoFile = '~/.vim-fuf'
@@ -787,6 +838,13 @@ See also: |fuf-vimrc-example|
 <
         長い補完アイテムは、この長さに収まるよう省略して表示します。
 
+                                                      *g:fuf_previewHeight*  >
+  let g:fuf_previewHeight = 5
+<
+        プレビューをサポートするモードを起動したとき、'cmdheight'がこの値に設
+        定されます。選択されている補完アイテムの情報がコマンドライン領域に表示
+        されます。0 ならプレビュー機能は無効になります。
+
                                                           *g:fuf_useMigemo*  >
   let g:fuf_useMigemo = 0
 <
@@ -796,9 +854,9 @@ See also: |fuf-vimrc-example|
 Buffer モード用 ~
 
                                                       *g:fuf_buffer_prompt*  >
-  let g:fuf_buffer_prompt = '>Buffer>'
+  let g:fuf_buffer_prompt = '>Buffer[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                  *g:fuf_buffer_switchOrder*  >
   let g:fuf_buffer_switchOrder = 10
@@ -815,9 +873,9 @@ Buffer モード用 ~
 File モード用 ~
 
                                                         *g:fuf_file_prompt*  >
-  let g:fuf_file_prompt = '>File>'
+  let g:fuf_file_prompt = '>File[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                    *g:fuf_file_switchOrder*  >
   let g:fuf_file_switchOrder = 20
@@ -834,9 +892,9 @@ File モード用 ~
 Directory モード用 ~
 
                                                          *g:fuf_dir_prompt*  >
-  let g:fuf_dir_prompt = '>Dir>'
+  let g:fuf_dir_prompt = '>Dir[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                     *g:fuf_dir_switchOrder*  >
   let g:fuf_dir_switchOrder = 30
@@ -853,9 +911,9 @@ Directory モード用 ~
 Mru-File モード用 ~
 
                                                      *g:fuf_mrufile_prompt*  >
-  let g:fuf_mrufile_prompt = '>Mru-File>'
+  let g:fuf_mrufile_prompt = '>Mru-File[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                 *g:fuf_mrufile_switchOrder*  >
   let g:fuf_mrufile_switchOrder = 40
@@ -877,9 +935,9 @@ Mru-File モード用 ~
 Mru-Cmd モード用 ~
 
                                                       *g:fuf_mrucmd_prompt*  >
-  let g:fuf_mrucmd_prompt = '>Mru-Cmd>'
+  let g:fuf_mrucmd_prompt = '>Mru-Cmd[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                  *g:fuf_mrucmd_switchOrder*  >
   let g:fuf_mrucmd_switchOrder = 50
@@ -901,9 +959,9 @@ Mru-Cmd モード用 ~
 Bookmark モード用 ~
 
                                                     *g:fuf_bookmark_prompt*  >
-  let g:fuf_bookmark_prompt = '>Bookmark>'
+  let g:fuf_bookmark_prompt = '>Bookmark[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                *g:fuf_bookmark_switchOrder*  >
   let g:fuf_bookmark_switchOrder = 60
@@ -926,9 +984,9 @@ Bookmark モード用 ~
 Tag モード用 ~
 
                                                          *g:fuf_tag_prompt*  >
-  let g:fuf_tag_prompt = '>Tag>'
+  let g:fuf_tag_prompt = '>Tag[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                     *g:fuf_tag_switchOrder*  >
   let g:fuf_tag_switchOrder = 70
@@ -936,13 +994,19 @@ Tag モード用 ~
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
 
+                                                      *g:fuf_tag_cache_dir*  >
+  let g:fuf_tag_cache_dir = '~/.vim-fuf-cache/tag'
+<
+        このディレクトリ内にキャッシュファイルが作成されます。空文字列なら作成
+        されません。
+
                                              *fuf-options-for-taggedfile-mode*
 Tagged-File モード用 ~
 
                                                   *g:fuf_taggedfile_prompt*  >
-  let g:fuf_taggedfile_prompt = '>Tagged-File>'
+  let g:fuf_taggedfile_prompt = '>Tagged-File[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_taggedfile_switchOrder*  >
   let g:fuf_taggedfile_switchOrder = 80
@@ -950,13 +1014,19 @@ Tagged-File モード用 ~
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
 
+                                               *g:fuf_taggedfile_cache_dir*  >
+  let g:fuf_taggedfile_cache_dir = '~/.vim-fuf-cache/taggedfile'
+<
+        このディレクトリ内にキャッシュファイルが作成されます。空文字列なら作成
+        されません。
+
                                                *fuf-options-for-jumplist-mode*
 Jump-List モード用 ~
 
                                                     *g:fuf_jumplist_prompt*  >
-  let g:fuf_jumplist_prompt = '>Jump-List>'
+  let g:fuf_jumplist_prompt = '>Jump-List[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                *g:fuf_jumplist_switchOrder*  >
   let g:fuf_jumplist_switchOrder = 90
@@ -968,9 +1038,9 @@ Jump-List モード用 ~
 Change-List モード用 ~
 
                                                   *g:fuf_changelist_prompt*  >
-  let g:fuf_changelist_prompt = '>Change-List>'
+  let g:fuf_changelist_prompt = '>Change-List[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_changelist_switchOrder*  >
   let g:fuf_changelist_switchOrder = 100
@@ -982,15 +1052,49 @@ Change-List モード用 ~
 Quickfix モード用 ~
 
                                                   *g:fuf_quickfix_prompt*  >
-  let g:fuf_quickfix_prompt = '>Quickfix>'
+  let g:fuf_quickfix_prompt = '>Quickfix[]>'
 <
-        プロンプト文字列。
+        プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_quickfix_switchOrder*  >
   let g:fuf_quickfix_switchOrder = 110
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
+
+                                             *fuf-options-for-line-mode*
+Line モード用 ~
+
+                                                        *g:fuf_line_prompt*  >
+  let g:fuf_line_prompt = '>Line[]>'
+<
+        プロンプト文字列。"[]" はインジケータに置換されます。
+
+                                                   *g:fuf_line_switchOrder*  >
+  let g:fuf_line_switchOrder = 120
+<
+        次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
+        には切り替えません。
+
+                                                   *fuf-options-for-help-mode*
+Help モード用 ~
+
+                                                        *g:fuf_help_prompt*  >
+  let g:fuf_help_prompt = '>Help[]>'
+<
+        プロンプト文字列。"[]" はインジケータに置換されます。
+
+                                                   *g:fuf_help_switchOrder*  >
+  let g:fuf_help_switchOrder = 130
+<
+        次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
+        には切り替えません。
+
+                                                     *g:fuf_help_cache_dir*  >
+  let g:fuf_help_cache_dir = '~/.vim-fuf-cache/help'
+<
+        このディレクトリ内にキャッシュファイルが作成されます。空文字列なら作成
+        されません。
 
 
 ==============================================================================
@@ -1021,6 +1125,8 @@ vimrc の例                                                 *fuf-vimrc-example*
   nnoremap <silent> <C-f><C-j> :FufJumpList<CR>
   nnoremap <silent> <C-f><C-g> :FufChangeList<CR>
   nnoremap <silent> <C-f><C-q> :FufQuickfix<CR>
+  nnoremap <silent> <C-f><C-l> :FufLine<CR>
+  nnoremap <silent> <C-f><C-h> :FufHelp<CR>
   nnoremap <silent> <C-f><C-b> :FufAddBookmark<CR>
   vnoremap <silent> <C-f><C-b> :FufAddBookmarkAsSelectedText<CR>
   nnoremap <silent> <C-f><C-e> :FufEditInfo<CR>

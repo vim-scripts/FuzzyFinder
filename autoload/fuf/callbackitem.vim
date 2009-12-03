@@ -49,7 +49,7 @@ function fuf#callbackitem#launch(initialPattern, partialMatching, prompt, listen
   else
     call map(s:items, 'fuf#makeNonPathItem(v:val, "")')
     call fuf#mapToSetSerialIndex(s:items, 1)
-    call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val)')
+    call map(s:items, 'fuf#setAbbrWithFormattedWord(v:val, 1)')
   endif
   call fuf#launch(s:MODE_NAME, a:initialPattern, a:partialMatching)
 endfunction
@@ -73,7 +73,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return s:prompt
+  return fuf#formatPrompt(s:prompt, self.partialMatching)
 endfunction
 
 "
@@ -92,15 +92,15 @@ endfunction
 "
 function s:handler.makePatternSet(patternBase)
   let parser = (s:forPath
-        \       ? 's:parsePrimaryPatternForPath'
-        \       : 's:parsePrimaryPatternForNonPath')
+        \       ? 's:interpretPrimaryPatternForPath'
+        \       : 's:interpretPrimaryPatternForNonPath')
   return fuf#makePatternSet(a:patternBase, parser, self.partialMatching)
 endfunction
 
 "
 function s:handler.makePreviewLines(word, count)
   if s:forPath
-    return fuf#makePreviewLinesForFile(a:word, count, self.getPreviewHeight())
+    return fuf#makePreviewLinesForFile(a:word, a:count, self.getPreviewHeight())
   endif
   return []
 endfunction
