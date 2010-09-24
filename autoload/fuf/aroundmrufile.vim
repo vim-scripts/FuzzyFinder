@@ -1,5 +1,5 @@
 "=============================================================================
-" Copyright (c) 2007-2010 Takeshi NISHIDA
+" Copyright (c) 2010 Takeshi NISHIDA
 "
 "=============================================================================
 " LOAD GUARD {{{1
@@ -13,29 +13,29 @@ endif
 " GLOBAL FUNCTIONS {{{1
 
 "
-function fuf#mrufile#createHandler(base)
+function fuf#aroundmrufile#createHandler(base)
   return a:base.concretize(copy(s:handler))
 endfunction
 
 "
-function fuf#mrufile#getSwitchOrder()
-  return g:fuf_mrufile_switchOrder
+function fuf#aroundmrufile#getSwitchOrder()
+  return g:fuf_aroundmrufile_switchOrder
 endfunction
 
 "
-function fuf#mrufile#renewCache()
+function fuf#aroundmrufile#renewCache()
   let s:cache = {}
 endfunction
 
 "
-function fuf#mrufile#requiresOnCommandPre()
+function fuf#aroundmrufile#requiresOnCommandPre()
   return 0
 endfunction
 
 "
-function fuf#mrufile#onInit()
-  call fuf#defineLaunchCommand('FufMruFile', s:MODE_NAME, '""')
-  augroup fuf#mrufile
+function fuf#aroundmrufile#onInit()
+  call fuf#defineLaunchCommand('FufAroundMruFile', s:MODE_NAME, '""')
+  augroup fuf#aroundmrufile
     autocmd!
     autocmd BufEnter     * call s:updateInfo()
     autocmd BufWritePost * call s:updateInfo()
@@ -55,35 +55,44 @@ function s:updateInfo()
   endif
   let items = fuf#loadDataFile(s:MODE_NAME, 'items')
   let items = fuf#updateMruList(
-        \ items, { 'word' : expand('%:p'), 'time' : localtime() },
-        \ g:fuf_mrufile_maxItem, g:fuf_mrufile_exclude)
+        \ items, { 'word' : expand('%:p:h') },
+        \ g:fuf_aroundmrufile_maxDir, g:fuf_aroundmrufile_exclude)
   call fuf#saveDataFile(s:MODE_NAME, 'items', items)
-  call s:removeItemFromCache(expand('%:p'))
 endfunction
 
 "
-function s:removeItemFromCache(word)
-  for items in values(s:cache)
-    if exists('items[a:word]')
-      unlet items[a:word]
-    endif
+function s:expandSearchDir(dir, level)
+  let dirs = [a:dir]
+  let dirPrev = a:dir
+  for i in range(a:level)
+    let dirPrev = l9#concatPaths([dirPrev, '*'])
+    call add(dirs, dirPrev)
   endfor
+  let dirPrev = a:dir
+  for i in range(a:level)
+    let dirPrevPrev = dirPrev
+    let dirPrev = fnamemodify(dirPrev, ':h')
+    if dirPrevPrev ==# dirPrev
+      break
+    endif
+    call add(dirs, dirPrev)
+  endfor
+  return dirs
 endfunction
 
-" returns empty value if invalid item
-function s:formatItemUsingCache(item)
-  if a:item.word !~ '\S'
-    return {}
-  endif
-  if !exists('s:cache[a:item.word]')
-    if filereadable(a:item.word)
-      let s:cache[a:item.word] = fuf#makePathItem(
-            \ fnamemodify(a:item.word, ':p:~'), strftime(g:fuf_timeFormat, a:item.time), 0)
-    else
-      let s:cache[a:item.word] = {}
+"
+function s:listFilesUsingCache(dir)
+  if !exists('s:cache[a:dir]')
+    let s:cache[a:dir] = [a:dir] +
+          \              split(glob(a:dir . l9#getPathSeparator() . "*" ), "\n") +
+          \              split(glob(a:dir . l9#getPathSeparator() . ".*"), "\n")
+    call filter(s:cache[a:dir], 'filereadable(v:val)')
+    call map(s:cache[a:dir], 'fuf#makePathItem(fnamemodify(v:val, ":~"), "", 0)')
+    if len(g:fuf_aroundmrufile_exclude)
+      call filter(s:cache[a:dir], 'v:val.word !~ g:fuf_aroundmrufile_exclude')
     endif
   endif
-  return s:cache[a:item.word]
+  return s:cache[a:dir]
 endfunction
 
 " }}}1
@@ -91,6 +100,7 @@ endfunction
 " s:handler {{{1
 
 let s:handler = {}
+let s:OPEN_TYPE_EXPAND = -1
 
 "
 function s:handler.getModeName()
@@ -99,7 +109,8 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return fuf#formatPrompt(g:fuf_mrufile_prompt, self.partialMatching, '')
+  let levelString = '[' . g:fuf_aroundmrufile_searchLevel . ']'
+  return fuf#formatPrompt(g:fuf_aroundmrufile_prompt, self.partialMatching, levelString)
 endfunction
 
 "
@@ -130,7 +141,14 @@ endfunction
 
 "
 function s:handler.onOpen(word, mode)
-  call fuf#openFile(a:word, a:mode, g:fuf_reuseWindow)
+  if a:mode ==# s:OPEN_TYPE_EXPAND
+    call fuf#setOneTimeVariables(['g:fuf_aroundmrufile_searchLevel',
+          \                       self.searchLevel + 1])
+    let self.reservedMode = self.getModeName()
+    return
+  else
+    call fuf#openFile(a:word, a:mode, g:fuf_reuseWindow)
+  endif
 endfunction
 
 "
@@ -139,10 +157,17 @@ endfunction
 
 "
 function s:handler.onModeEnterPost()
+  let self.searchLevel = g:fuf_aroundmrufile_searchLevel
+  call fuf#defineKeyMappingInHandler(g:fuf_aroundmrufile_keyExpand,
+        \                            'onCr(' . s:OPEN_TYPE_EXPAND . ')')
   " NOTE: Comparing filenames is faster than bufnr('^' . fname . '$')
   let bufNamePrev = fnamemodify(bufname(self.bufNrPrev), ':p:~')
   let self.items = fuf#loadDataFile(s:MODE_NAME, 'items')
-  call map(self.items, 's:formatItemUsingCache(v:val)')
+  call map(self.items, 's:expandSearchDir(v:val.word, g:fuf_aroundmrufile_searchLevel)')
+  let self.items = l9#concat(self.items)
+  let self.items = l9#unique(self.items)
+  call map(self.items, 's:listFilesUsingCache(v:val)')
+  let self.items = l9#concat(self.items)
   call filter(self.items, '!empty(v:val) && v:val.word !=# bufNamePrev')
   call fuf#mapToSetSerialIndex(self.items, 1)
   call fuf#mapToSetAbbrWithSnippedWordAsPath(self.items)

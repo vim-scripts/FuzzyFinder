@@ -1,13 +1,12 @@
 "=============================================================================
-" Copyright (c) 2007-2009 Takeshi NISHIDA
+" Copyright (c) 2007-2010 Takeshi NISHIDA
 "
 "=============================================================================
 " LOAD GUARD {{{1
 
-if exists('g:loaded_autoload_fuf_dir') || v:version < 702
+if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
   finish
 endif
-let g:loaded_autoload_fuf_dir = 1
 
 " }}}1
 "=============================================================================
@@ -48,7 +47,7 @@ let s:MODE_NAME = expand('<sfile>:t:r')
 
 "
 function s:enumItems(dir)
-  let key = getcwd() . g:fuf_dir_exclude . "\n" . a:dir
+  let key = getcwd() . g:fuf_ignoreCase . g:fuf_dir_exclude . "\n" . a:dir
   if !exists('s:cache[key]')
     let s:cache[key] = fuf#enumExpandedDirsEntries(a:dir, g:fuf_dir_exclude)
     call filter(s:cache[key], 'v:val.word =~# ''[/\\]$''')
@@ -74,7 +73,7 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return fuf#formatPrompt(g:fuf_dir_prompt, self.partialMatching)
+  return fuf#formatPrompt(g:fuf_dir_prompt, self.partialMatching, '')
 endfunction
 
 "
@@ -83,8 +82,8 @@ function s:handler.getPreviewHeight()
 endfunction
 
 "
-function s:handler.targetsPath()
-  return 1
+function s:handler.isOpenable(enteredPattern)
+  return a:enteredPattern =~# '[^/\\]$'
 endfunction
 
 "
