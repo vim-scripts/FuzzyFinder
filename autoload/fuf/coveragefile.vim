@@ -23,6 +23,11 @@ function fuf#coveragefile#getSwitchOrder()
 endfunction
 
 "
+function fuf#coveragefile#getEditableDataNames()
+  return ['coverages']
+endfunction
+
+"
 function fuf#coveragefile#renewCache()
   let s:cache = {}
 endfunction
@@ -67,7 +72,8 @@ endfunction
 function s:registerCoverage()
   let patterns = []
   while 1
-    let pattern = l9#inputHl('Question', '[fuf] Glob pattern for coverage (<Esc> and end):')
+    let pattern = l9#inputHl('Question', '[fuf] Glob pattern for coverage (<Esc> and end):',
+          \                  '', 'file')
     if pattern !~ '\S'
       break
     endif
@@ -83,9 +89,9 @@ function s:registerCoverage()
     call fuf#echoWarning('Canceled')
     return
   endif
-  let coverages = fuf#loadDataFile(s:MODE_NAME, 'items')
+  let coverages = fuf#loadDataFile(s:MODE_NAME, 'coverages')
   call insert(coverages, {'name': name, 'patterns': patterns})
-  call fuf#saveDataFile(s:MODE_NAME, 'items', coverages)
+  call fuf#saveDataFile(s:MODE_NAME, 'coverages', coverages)
 endfunction
 
 "
@@ -101,7 +107,7 @@ endfunction
 
 "
 function s:changeCoverage(name)
-  let coverages = fuf#loadDataFile(s:MODE_NAME, 'items')
+  let coverages = fuf#loadDataFile(s:MODE_NAME, 'coverages')
   if a:name !~ '\S'
     let names = map(copy(coverages), 'v:val.name')
     call fuf#callbackitem#launch('', 0, '>Coverage>', s:createChangeCoverageListener(), names, 0)

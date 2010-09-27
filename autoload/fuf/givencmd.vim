@@ -23,6 +23,11 @@ function fuf#givencmd#getSwitchOrder()
 endfunction
 
 "
+function fuf#givencmd#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#givencmd#renewCache()
 endfunction
 

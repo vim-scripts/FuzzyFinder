@@ -23,6 +23,11 @@ function fuf#jumplist#getSwitchOrder()
 endfunction
 
 "
+function fuf#jumplist#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#jumplist#renewCache()
 endfunction
 

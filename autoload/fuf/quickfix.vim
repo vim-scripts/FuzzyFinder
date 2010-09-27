@@ -23,6 +23,11 @@ function fuf#quickfix#getSwitchOrder()
 endfunction
 
 "
+function fuf#quickfix#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#quickfix#renewCache()
 endfunction
 

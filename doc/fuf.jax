@@ -47,7 +47,8 @@ FuzzyFinder が検索できる対象は次の通りです:
         - 最近使ったファイル
         - 最近使ったファイルの近くのファイル
         - 最近使ったコマンドライン
-        - ブックマーク
+        - ブックマークされたファイル
+        - ブックマークされたディレクトリ
         - タグ
         - タグファイルに含まれるファイル
         - ジャンプリスト
@@ -96,9 +97,9 @@ ZIPファイルをランタイムディレクトリに展開します。
         |:FufCoverageFile| - Coverage-File モード (|fuf-coveragefile-mode|)
         |:FufDir|          - Directory モード (|fuf-dir-mode|)
         |:FufMruFile|      - MRU-File モード (|fuf-mrufile-mode|)
-        |:FufAroundMruFile|- Around-MRU-File モード (|fuf-aroundmrufile-mode|)
         |:FufMruCmd|       - MRU-Command モード (|fuf-mrucmd-mode|)
-        |:FufBookmark|     - Bookmark モード (|fuf-bookmark-mode|)
+        |:FufBookmarkFile| - Bookmark-File モード (|fuf-bookmarkfile-mode|)
+        |:FufBookmarkDir|  - Bookmark-Dir モード (|fuf-bookmarkdir-mode|)
         |:FufTag|          - Tag モード (|fuf-tag-mode|)
         |:FufTaggedFile|   - Tagged-File モード (|fuf-taggedfile-mode|)
         |:FufJumpList|     - Jump-List モード (|fuf-jumplist-mode|)
@@ -205,20 +206,12 @@ MRU-File モード ~
 
 このモードは最近使ったファイルを選択して開くインターフェースを提供します。
 
-|BufEnter| と |BufWritePost| で行う処理がパフォーマンス上の問題を起こしうるの
-で、デフォルトでは|g:fuf_modesDisable|で無効化するモードに指定されています。
-
-                                                      *fuf-aroundmrufile-mode*
-Around-MRU-File モード ~
-
-このモードは最近使ったファイルの付近にあるファイルを選択して開くインターフェー
-スを提供します。
-
-Around-MRU-File モード中に <C-]> (|g:fuf_aroundmrufile_keyExpand|) を押すと、
-ディレクトリツリーの検索範囲を広げます。(|g:fuf_aroundmrufile_searchLevel|)
+このモード中に <C-]> (|g:fuf_mrufile_keyExpand|) を押すと、最近使ったファイル
+の付近にあるファイルを検索します。このキーを押す毎に、検索範囲をディレクトリツ
+リーの上下に1階層ずつ広げます。
 
 |BufEnter| と |BufWritePost| で行う処理がパフォーマンス上の問題を起こしうるの
-で、デフォルトでは|g:fuf_modesDisable|で無効化するモードに指定されています。
+で、デフォルトでは無効化するモードに指定されています。(|g:fuf_modesDisable|)
 
                                                              *fuf-mrucmd-mode*
 MRU-Command モード ~
@@ -226,24 +219,36 @@ MRU-Command モード ~
 このモードは最近使ったコマンドラインを選択して開くインターフェースを提供します
 。
 このモードに必要な、コマンドラインモードの <CR> のマッピングに副作用があるので、
-、デフォルトでは|g:fuf_modesDisable|で無効化するモードに指定されています。
+、デフォルトでは無効化するモードに指定されています。(|g:fuf_modesDisable|)
 
-                                                           *fuf-bookmark-mode*
-Bookmark モード ~
+                                                       *fuf-bookmarkfile-mode*
+Bookmark-File モード ~
 
 このモードは事前に追加したブックマークを選択してその行へジャンプするインターフ
 ェースを提供します。
 
-|:FufAddBookmark|コマンドでカーソルのある行をブックマークに追加できます。この
-コマンドを実行すると、ブックマーク名の入力を求められます。
+|:FufBookmarkFileAdd|コマンドでカーソルのある行をブックマークに追加できます。
+このコマンドを実行すると、ブックマーク名の入力を求められます。
 
 FuzzyFinder はジャンプする行番号を調整します。ブックマークされた行がブックマー
 クされたときのパターンとマッチしない場合、FuzzyFinder はブックマークされた位置
 の周辺でマッチする行を探します。なのでブックマークした行が多少移動していたとし
 ても、そこでジャンプすることができます。ブックマークした行番号へ調整せずにジャ
-ンプしたい場合、|g:fuf_bookmark_searchRange|を 0 に設定してください。
+ンプしたい場合、|g:fuf_bookmarkfile_searchRange|を 0 に設定してください。
 
-Bookmark モード中に <C-]> (|g:fuf_bookmark_keyDelete|) を押すと選択したブックマ
+このモード中に <C-]> (|g:fuf_bookmarkfile_keyDelete|) を押すと選択したブックマ
+ークを削除することができます。
+
+                                                        *fuf-bookmarkdir-mode*
+Bookmark-Dir モード ~
+
+このモードは事前に追加したブックマークを選択してカレントディレクトリを変更する
+するインターフェースを提供します。
+
+|:FufBookmarkDirAdd|コマンドでディレクトリをブックマークに追加できます。このコ
+マンドを実行すると、ディレクトリのパスとブックマーク名の入力を求められます。
+
+このモード中に <C-]> (|g:fuf_bookmarkdir_keyDelete|) を押すと選択したブックマ
 ークを削除することができます。
 
                                                                 *fuf-tag-mode*
@@ -672,15 +677,6 @@ See also: |fuf-vimrc-example|
 
         FuzzyFinder 起動後に {pattern} が挿入されます。
 
-                                                           *:FufAroundMruFile*
-:FufAroundMruFile [{pattern}]
-        Around-MRU-File モードを起動します。
-
-        ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
-        うになります。
-
-        FuzzyFinder 起動後に {pattern} が挿入されます。
-
                                                                   *:FufMruCmd*
 :FufMruCmd [{pattern}]
         MRU-Command モードを起動します。
@@ -690,9 +686,18 @@ See also: |fuf-vimrc-example|
 
         FuzzyFinder 起動後に {pattern} が挿入されます。
 
-                                                                *:FufBookmark*
-:FufBookmark [{pattern}]
-        Bookmark モードを起動します。
+                                                            *:FufBookmarkFile*
+:FufBookmarkFile [{pattern}]
+        Bookmark-File モードを起動します。
+
+        ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
+        うになります。
+
+        FuzzyFinder 起動後に {pattern} が挿入されます。
+
+                                                             *:FufBookmarkDir*
+:FufBookmarkDir [{pattern}]
+        Bookmark-Dir モードを起動します。
 
         ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
         うになります。
@@ -788,15 +793,22 @@ See also: |fuf-vimrc-example|
 
         See also: |fuf-coveragefile-mode|
 
-                                                             *:FufAddBookmark*
-:FufAddBookmark [{name}]
-        カーソル行をブックマークに追加します。詳しくは|fuf-adding-bookmark|を
-        参照してください。
+                                                         *:FufBookmarkFileAdd*
+:FufBookmarkFileAdd [{name}]
+        カーソル行をブックマークに追加します。
 
-                                               *:FufAddBookmarkAsSelectedText*
-:FufAddBookmarkAsSelectedText
-        最後に選択されたテキストをブックマーク名とする以外は|:FufAddBookmark|
-        と同じです。
+        See also: |fuf-bookmarkfile-mode|
+
+                                           *:FufBookmarkFileAddAsSelectedText*
+:FufBookmarkFileAddAsSelectedText
+        最後に選択されたテキストをブックマーク名とする以外は
+        |:FufBookmarkFileAdd|と同じです。
+
+                                                         *:FufBookmarkDirAdd*
+:FufBookmarkDirAdd [{name}]
+        ディレクトリをブックマークに追加します。
+
+        See also: |fuf-bookmarkdir-mode|
 
                                                               *:FufRenewCache*
 :FufRenewCache
@@ -811,7 +823,7 @@ See also: |fuf-vimrc-example|
 全モード用 ~
 
                                                        *g:fuf_modesDisable*  >
-  let g:fuf_modesDisable = [ 'mrufile', 'aroundmrufile', 'mrucmd', ]
+  let g:fuf_modesDisable = [ 'mrufile', 'mrucmd', ]
 <
         無効にするモード名のリスト。これに含まれるモードは初期化されず、イベン
         トの処理も行われません。
@@ -1057,7 +1069,7 @@ MRU-File モード用 ~
         には切り替えません。
 
                                                     *g:fuf_mrufile_exclude*  >
-  let g:fuf_mrufile_exclude = '\v\~$|\.(bak|orig|sw[po])$|^(\/\/|\\\\|\/mnt\/|\/media\/)'
+  let g:fuf_mrufile_exclude = '\v\~$|\.(o|exe|dll|bak|orig|sw[po])$|^(\/\/|\\\\|\/mnt\/|\/media\/)'
 <
         補完リストから除外したいアイテムの正規表現パターン。
 
@@ -1066,40 +1078,15 @@ MRU-File モード用 ~
 <
         保持するMRUアイテムの上限値。
 
-                                          *fuf-options-for-aroundmrufile-mode*
-Around-MRU-File モード用 ~
-
-                                               *g:fuf_aroundmrufile_prompt*  >
-  let g:fuf_aroundmrufile_prompt = '>MRU-File[]>'
+                                                 *g:fuf_mrufile_maxItemDir*  >
+  let g:fuf_mrufile_maxItemDir = 50
 <
-        プロンプト文字列。"[]" はインジケータに置換されます。
+        保持するMRUアイテムの親ディレクトリ(周辺検索で使われる)の上限値。
 
-                                          *g:fuf_aroundmrufile_switchOrder*  >
-  let g:fuf_aroundmrufile_switchOrder = 60
+                                                  *g:fuf_mrufile_keyExpand*  >
+  let g:fuf_mrufile_keyExpand = '<C-]>'
 <
-        次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
-        には切り替えません。
-
-                                              *g:fuf_aroundmrufile_exclude*  >
-  let g:fuf_aroundmrufile_exclude = '\v\~$|\.(o|exe|dll|bak|orig|sw[po])$|(^|[/\\])\.(hg|git|bzr)($|[/\\])|^(\/\/|\\\\|\/mnt\/|\/media\/)'
-<
-        補完リストから除外したいアイテムの正規表現パターン。
-
-                                              *g:fuf_aroundmrufile_maxDir*  >
-  let g:fuf_aroundmrufile_maxDir = 100
-<
-        保持するMRUアイテムの親ディレクトリの上限値。
-
-                                          *g:fuf_aroundmrufile_searchLevel*  >
-  let g:fuf_aroundmrufile_searchLevel = 0
-<
-        検索するディレクトリツリーの上下の階層数。
-
-
-                                            *g:fuf_aroundmrufile_keyExpand*  >
-  let g:fuf_aroundmrufile_keyExpand = '<C-]>'
-<
-        |g:fuf_aroundmrufile_searchLevel|を1増やすキー。
+        検索する範囲を広げるキー。
 
                                                  *fuf-options-for-mrucmd-mode*
 MRU-Cmd モード用 ~
@@ -1125,28 +1112,47 @@ MRU-Cmd モード用 ~
 <
         保持するMRUアイテムの上限値。
 
-                                               *fuf-options-for-Bookmark-mode*
-Bookmark モード用 ~
+                                           *fuf-options-for-bookmarkfile-mode*
+Bookmark-File モード用 ~
 
-                                                    *g:fuf_bookmark_prompt*  >
-  let g:fuf_bookmark_prompt = '>Bookmark[]>'
+                                                    *g:fuf_bookmarkfile_prompt*  >
+  let g:fuf_bookmarkfile_prompt = '>BookmarkFile[]>'
 <
         プロンプト文字列。"[]" はインジケータに置換されます。
 
-                                               *g:fuf_bookmark_switchOrder*  >
-  let g:fuf_bookmark_switchOrder = 80
+                                               *g:fuf_bookmarkfile_switchOrder*  >
+  let g:fuf_bookmarkfile_switchOrder = 80
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
 
-                                               *g:fuf_bookmark_searchRange*  >
-  let g:fuf_bookmark_searchRange = 400
+                                               *g:fuf_bookmarkfile_searchRange*  >
+  let g:fuf_bookmarkfile_searchRange = 400
 <
         ジャンプするとき、ブックマークした位置からこの行数の範囲内でブックマー
         クしたときのパターンとマッチする行を探します。
 
-                                                 *g:fuf_bookmark_keyDelete*  >
-  let g:fuf_bookmark_keyDelete = '<C-]>'
+                                                 *g:fuf_bookmarkfile_keyDelete*  >
+  let g:fuf_bookmarkfile_keyDelete = '<C-]>'
+<
+        選択したブックマークを削除するキー。
+
+                                            *fuf-options-for-bookmarkdir-mode*
+Bookmark-Dir モード用 ~
+
+                                                    *g:fuf_bookmarkdir_prompt*  >
+  let g:fuf_bookmarkdir_prompt = '>BookmarkDir[]>'
+<
+        プロンプト文字列。"[]" はインジケータに置換されます。
+
+                                               *g:fuf_bookmarkdir_switchOrder*  >
+  let g:fuf_bookmarkdir_switchOrder = 90
+<
+        次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
+        には切り替えません。
+
+                                                 *g:fuf_bookmarkdir_keyDelete*  >
+  let g:fuf_bookmarkdir_keyDelete = '<C-]>'
 <
         選択したブックマークを削除するキー。
 
@@ -1159,7 +1165,7 @@ Tag モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                     *g:fuf_tag_switchOrder*  >
-  let g:fuf_tag_switchOrder = 90
+  let g:fuf_tag_switchOrder = 100
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1173,7 +1179,7 @@ Tagged-File モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_taggedfile_switchOrder*  >
-  let g:fuf_taggedfile_switchOrder = 100
+  let g:fuf_taggedfile_switchOrder = 110
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1187,7 +1193,7 @@ Jump-List モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                *g:fuf_jumplist_switchOrder*  >
-  let g:fuf_jumplist_switchOrder = 110
+  let g:fuf_jumplist_switchOrder = 120
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1201,7 +1207,7 @@ Change-List モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_changelist_switchOrder*  >
-  let g:fuf_changelist_switchOrder = 120
+  let g:fuf_changelist_switchOrder = 130
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1215,7 +1221,7 @@ Quickfix モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                              *g:fuf_quickfix_switchOrder*  >
-  let g:fuf_quickfix_switchOrder = 130
+  let g:fuf_quickfix_switchOrder = 140
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1229,7 +1235,7 @@ Line モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                    *g:fuf_line_switchOrder*  >
-  let g:fuf_line_switchOrder = 140
+  let g:fuf_line_switchOrder = 150
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1243,7 +1249,7 @@ Help モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                    *g:fuf_help_switchOrder*  >
-  let g:fuf_help_switchOrder = 150
+  let g:fuf_help_switchOrder = 160
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1260,32 +1266,35 @@ vimrc の例                                                 *fuf-vimrc-example*
         \ }
   let g:fuf_mrufile_maxItem = 500
   let g:fuf_mrucmd_maxItem = 500
-  nnoremap <silent> <C-n>      :FufBuffer<CR>
-  nnoremap <silent> <C-p>      :FufFileWithCurrentBufferDir<CR>
-  nnoremap <silent> <C-f><C-p> :FufFileWithFullCwd<CR>
-  nnoremap <silent> <C-f>p     :FufFile<CR>
-  nnoremap <silent> <C-f><C-a> :FufCoverageFileChange<CR>
-  nnoremap <silent> <C-f>a     :FufCoverageFileRegister<CR>
-  nnoremap <silent> <C-f><C-d> :FufDirWithCurrentBufferDir<CR>
-  nnoremap <silent> <C-f>d     :FufDirWithFullCwd<CR>
-  nnoremap <silent> <C-f>D     :FufDir<CR>
-  nnoremap <silent> <C-j>      :FufMruFile<CR>
-  nnoremap <silent> <C-k>      :FufAroundMruFile<CR>
-  nnoremap <silent> <C-f><C-k> :FufMruCmd<CR>
-  nnoremap <silent> <C-b>      :FufBookmark<CR>
-  nnoremap <silent> <C-f><C-t> :FufTag<CR>
-  nnoremap <silent> <C-f>t     :FufTag!<CR>
-  noremap  <silent> g]         :FufTagWithCursorWord!<CR>
-  nnoremap <silent> <C-f><C-f> :FufTaggedFile<CR>
-  nnoremap <silent> <C-f><C-j> :FufJumpList<CR>
-  nnoremap <silent> <C-f><C-g> :FufChangeList<CR>
-  nnoremap <silent> <C-f><C-q> :FufQuickfix<CR>
-  nnoremap <silent> <C-f><C-l> :FufLine<CR>
-  nnoremap <silent> <C-f><C-h> :FufHelp<CR>
-  nnoremap <silent> <C-f><C-b> :FufAddBookmark<CR>
-  vnoremap <silent> <C-f><C-b> :FufAddBookmarkAsSelectedText<CR>
-  nnoremap <silent> <C-f><C-e> :FufEditDataFile<CR>
-  nnoremap <silent> <C-f><C-r> :FufRenewCache<CR>
+  nnoremap <silent> sj     :FufBuffer<CR>
+  nnoremap <silent> sk     :FufFileWithCurrentBufferDir<CR>
+  nnoremap <silent> sK     :FufFileWithFullCwd<CR>
+  nnoremap <silent> s<C-k> :FufFile<CR>
+  nnoremap <silent> sl     :FufCoverageFileChange<CR>
+  nnoremap <silent> sL     :FufCoverageFileChange<CR>
+  nnoremap <silent> s<C-l> :FufCoverageFileRegister<CR>
+  nnoremap <silent> sd     :FufDirWithCurrentBufferDir<CR>
+  nnoremap <silent> sD     :FufDirWithFullCwd<CR>
+  nnoremap <silent> s<C-d> :FufDir<CR>
+  nnoremap <silent> sn     :FufMruFile<CR>
+  nnoremap <silent> sm     :FufMruCmd<CR>
+  nnoremap <silent> su     :FufBookmarkFile<CR>
+  nnoremap <silent> s<C-u> :FufBookmarkFileAdd<CR>
+  vnoremap <silent> s<C-u> :FufBookmarkFileAddAsSelectedText<CR>
+  nnoremap <silent> si     :FufBookmarkDir<CR>
+  nnoremap <silent> s<C-i> :FufBookmarkDirAdd<CR>
+  nnoremap <silent> st     :FufTag<CR>
+  nnoremap <silent> sT     :FufTag!<CR>
+  noremap  <silent> s]     :FufTagWithCursorWord!<CR>
+  nnoremap <silent> sg     :FufTaggedFile<CR>
+  nnoremap <silent> sG     :FufTaggedFile!<CR>
+  nnoremap <silent> so     :FufJumpList<CR>
+  nnoremap <silent> sp     :FufChangeList<CR>
+  nnoremap <silent> sq     :FufQuickfix<CR>
+  nnoremap <silent> sy     :FufLine<CR>
+  nnoremap <silent> sh     :FufHelp<CR>
+  nnoremap <silent> se     :FufEditDataFile<CR>
+  nnoremap <silent> sr     :FufRenewCache<CR>
 <
 
 ==============================================================================

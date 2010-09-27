@@ -23,6 +23,11 @@ function fuf#changelist#getSwitchOrder()
 endfunction
 
 "
+function fuf#changelist#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#changelist#renewCache()
 endfunction
 

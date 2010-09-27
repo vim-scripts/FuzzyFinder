@@ -23,6 +23,11 @@ function fuf#mrucmd#getSwitchOrder()
 endfunction
 
 "
+function fuf#mrucmd#getEditableDataNames()
+  return ['items']
+endfunction
+
+"
 function fuf#mrucmd#renewCache()
 endfunction
 

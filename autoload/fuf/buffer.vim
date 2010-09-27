@@ -23,6 +23,11 @@ function fuf#buffer#getSwitchOrder()
 endfunction
 
 "
+function fuf#buffer#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#buffer#renewCache()
 endfunction
 

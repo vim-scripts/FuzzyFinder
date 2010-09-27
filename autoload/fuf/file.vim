@@ -23,6 +23,11 @@ function fuf#file#getSwitchOrder()
 endfunction
 
 "
+function fuf#file#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#file#renewCache()
   let s:cache = {}
 endfunction

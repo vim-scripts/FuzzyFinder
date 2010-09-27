@@ -421,12 +421,13 @@ function fuf#getDataFileTime(modeName, dataName)
 endfunction
 
 "
-function s:createDataBufferListener(modeName)
-  let listener = { 'modeName': a:modeName }
+function s:createDataBufferListener(dataFile)
+  let listener = { 'dataFile': a:dataFile }
 
   function listener.onWrite(lines)
+    let [modeName, dataName] = split(self.dataFile, l9#getPathSeparator())
     let items = map(filter(a:lines, '!empty(v:val)'), 'eval(v:val)')
-    call fuf#saveDataFile(self.modeName, 'items', items)
+    call fuf#saveDataFile(modeName, dataName, items)
     echo "Data files updated"
     return 1
   endfunction
@@ -438,20 +439,28 @@ endfunction
 function s:createEditDataListener()
   let listener = {}
 
-  function listener.onComplete(modeName, method)
-    let bufName = '[fuf-info-' . a:modeName . ']'
-    let lines = l9#readFile(l9#concatPaths([g:fuf_dataDir, a:modeName, 'items']))
+  function listener.onComplete(dataFile, method)
+    let bufName = '[fuf-info]'
+    let lines = l9#readFile(l9#concatPaths([g:fuf_dataDir, a:dataFile]))
     call l9#tempbuffer#openWritable(bufName, 'vim', lines, 0, 0, 0,
-          \                         s:createDataBufferListener(a:modeName))
+          \                         s:createDataBufferListener(a:dataFile))
   endfunction
 
   return listener
 endfunction
 
 "
+function s:getEditableDataFiles(modeName)
+  let dataFiles = fuf#{a:modeName}#getEditableDataNames()
+  call filter(dataFiles, 'fuf#getDataFileTime(a:modeName, v:val) != -1')
+  return map(dataFiles, 'l9#concatPaths([a:modeName, v:val])')
+endfunction
+
+"
 function fuf#editDataFile()
-  let modes = filter(copy(fuf#getModeNames()), 'fuf#getDataFileTime(v:val, "items") != -1')
-  call fuf#callbackitem#launch('', 0, '>Mode>', s:createEditDataListener(), modes, 0)
+  let dataFiles = map(copy(fuf#getModeNames()), 's:getEditableDataFiles(v:val)')
+  let dataFiles = l9#concat(dataFiles)
+  call fuf#callbackitem#launch('', 0, '>Mode>', s:createEditDataListener(), dataFiles, 0)
 endfunction
 
 " 
@@ -600,25 +609,25 @@ endfunction
 " range of return value is [0.0, 1.0]
 function s:scoreSequentialMatching(word, pattern)
   if empty(a:pattern)
-    return 0.0
+    return str2float('0.0')
   endif
   let pos = stridx(a:word, a:pattern)
   if pos < 0
-    return 0.0
+    return str2float('0.0')
   endif
   let lenRest = len(a:word) - len(a:pattern) - pos
-  return (pos == 0 ? 0.5 : 0.0) + 0.5 / (lenRest + 1)
+  return str2float(pos == 0 ? '0.5' : '0.0') + str2float('0.5') / (lenRest + 1)
 endfunction
 
 " range of return value is [0.0, 1.0]
 function s:scoreBoundaryMatching(wordForBoundary, pattern, exprBoundary)
   if empty(a:pattern)
-    return 0.0
+    return str2float('0.0')
   endif
   if !eval(a:exprBoundary)
     return 0
   endif
-  return 0.5 + 0.5 * s:scoreSequentialMatching(a:wordForBoundary, a:pattern)
+  return (s:scoreSequentialMatching(a:wordForBoundary, a:pattern) + 1) / 2
 endfunction
 
 "

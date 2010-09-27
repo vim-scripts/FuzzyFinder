@@ -1,5 +1,5 @@
 "=============================================================================
-" Copyright (c) 2007-2010 Takeshi NISHIDA
+" Copyright (c) 2010 Takeshi NISHIDA
 "
 "=============================================================================
 " LOAD GUARD {{{1
@@ -13,29 +13,33 @@ endif
 " GLOBAL FUNCTIONS {{{1
 
 "
-function fuf#bookmark#createHandler(base)
+function fuf#bookmarkdir#createHandler(base)
   return a:base.concretize(copy(s:handler))
 endfunction
 
 "
-function fuf#bookmark#getSwitchOrder()
-  return g:fuf_bookmark_switchOrder
+function fuf#bookmarkdir#getSwitchOrder()
+  return g:fuf_bookmarkdir_switchOrder
 endfunction
 
 "
-function fuf#bookmark#renewCache()
+function fuf#bookmarkdir#getEditableDataNames()
+  return ['items']
 endfunction
 
 "
-function fuf#bookmark#requiresOnCommandPre()
+function fuf#bookmarkdir#renewCache()
+endfunction
+
+"
+function fuf#bookmarkdir#requiresOnCommandPre()
   return 0
 endfunction
 
 "
-function fuf#bookmark#onInit()
-  call fuf#defineLaunchCommand('FufBookmark', s:MODE_NAME, '""')
-  command! -bang -narg=?        FufAddBookmark               call s:bookmarkHere(<q-args>)
-  command! -bang -narg=0 -range FufAddBookmarkAsSelectedText call s:bookmarkHere(l9#getSelectedText())
+function fuf#bookmarkdir#onInit()
+  call fuf#defineLaunchCommand('FufBookmarkDir', s:MODE_NAME, '""')
+  command! -bang -narg=?        FufBookmarkDirAdd call s:bookmark(<q-args>)
 endfunction
 
 " }}}1
@@ -45,48 +49,20 @@ endfunction
 let s:MODE_NAME = expand('<sfile>:t:r')
 let s:OPEN_TYPE_DELETE = -1
 
-" opens a:path and jumps to the line matching to a:pattern from a:lnum within
-" a:range. if not found, jumps to a:lnum.
-function s:jumpToBookmark(path, mode, pattern, lnum)
-  call fuf#openFile(a:path, a:mode, g:fuf_reuseWindow)
-  call cursor(s:getMatchingLineNumber(getline(1, '$'), a:pattern, a:lnum), 0)
-  normal! zvzz
-endfunction
-
 "
-function s:getMatchingLineNumber(lines, pattern, lnumBegin)
-  let l = min([a:lnumBegin, len(a:lines)])
-  for [l0, l1] in map(range(0, g:fuf_bookmark_searchRange),
-        \             '[l + v:val, l - v:val]')
-    if l0 <= len(a:lines) && a:lines[l0 - 1] =~# a:pattern
-      return l0
-    elseif l1 >= 0 && a:lines[l1 - 1] =~# a:pattern
-      return l1
-    endif
-  endfor
-  return l
-endfunction
-
-"
-function s:getLinePattern(lnum)
-  return '\C\V\^' . escape(getline(a:lnum), '\') . '\$'
-endfunction
-
-"
-function s:bookmarkHere(word)
-  if !empty(&buftype) || expand('%') !~ '\S'
-    call fuf#echoWarning('Can''t bookmark this buffer.')
-    return
-  endif
+function s:bookmark(word)
   let item = {
-        \   'word' : (a:word =~# '\S' ? substitute(a:word, '\n', ' ', 'g')
-        \                             : pathshorten(expand('%:p:~')) . '|' . line('.') . '| ' . getline('.')),
-        \   'path' : expand('%:p'),
-        \   'lnum' : line('.'),
-        \   'pattern' : s:getLinePattern(line('.')),
         \   'time' : localtime(),
         \ }
-  let item.word = l9#inputHl('Question', '[fuf] Bookmark as:', item.word)
+
+  let item.path = l9#inputHl('Question', '[fuf] Directory to bookmark:',
+        \              fnamemodify(getcwd(), ':p:~'), 'dir')
+  if item.path !~ '\S'
+    call fuf#echoWarning('Canceled')
+    return
+  endif
+  let item.word = l9#inputHl('Question', '[fuf] Bookmark as:',
+        \               fnamemodify(getcwd(), ':p:~'))
   if item.word !~ '\S'
     call fuf#echoWarning('Canceled')
     return
@@ -119,12 +95,12 @@ endfunction
 
 "
 function s:handler.getPrompt()
-  return fuf#formatPrompt(g:fuf_bookmark_prompt, self.partialMatching, '')
+  return fuf#formatPrompt(g:fuf_bookmarkdir_prompt, self.partialMatching, '')
 endfunction
 
 "
 function s:handler.getPreviewHeight()
-  return g:fuf_previewHeight
+  return 0
 endfunction
 
 "
@@ -140,14 +116,7 @@ endfunction
 
 "
 function s:handler.makePreviewLines(word, count)
-  let item = s:findItem(fuf#loadDataFile(s:MODE_NAME, 'items'), a:word)
-  let lines = fuf#getFileLines(item.path)
-  if empty(lines)
-    return []
-  endif
-  let index = s:getMatchingLineNumber(lines, item.pattern, item.lnum) - 1
-  return fuf#makePreviewLinesAround(
-        \ lines, [index], a:count, self.getPreviewHeight())
+  return []
 endfunction
 
 "
@@ -166,7 +135,7 @@ function s:handler.onOpen(word, mode)
   else
     let item = s:findItem(fuf#loadDataFile(s:MODE_NAME, 'items'), a:word)
     if !empty(item)
-        call s:jumpToBookmark(item.path, a:mode, item.pattern, item.lnum)
+        execute ':cd ' . fnameescape(item.path)
     endif
   endif
 endfunction
@@ -177,7 +146,7 @@ endfunction
 
 "
 function s:handler.onModeEnterPost()
-  call fuf#defineKeyMappingInHandler(g:fuf_bookmark_keyDelete,
+  call fuf#defineKeyMappingInHandler(g:fuf_bookmarkdir_keyDelete,
         \                            'onCr(' . s:OPEN_TYPE_DELETE . ')')
   let self.items = fuf#loadDataFile(s:MODE_NAME, 'items')
   call map(self.items, 'fuf#makeNonPathItem(v:val.word, strftime(g:fuf_timeFormat, v:val.time))')

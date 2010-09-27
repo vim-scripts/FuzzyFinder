@@ -23,6 +23,11 @@ function fuf#callbackitem#getSwitchOrder()
 endfunction
 
 "
+function fuf#callbackitem#getEditableDataNames()
+  return []
+endfunction
+
+"
 function fuf#callbackitem#renewCache()
 endfunction
 
