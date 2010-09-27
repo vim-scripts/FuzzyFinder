@@ -126,8 +126,8 @@ function s:listAroundFilesUsingCache(dir)
           \              split(glob(a:dir . l9#getPathSeparator() . ".*"), "\n")
     call filter(s:aroundCache[a:dir], 'filereadable(v:val)')
     call map(s:aroundCache[a:dir], 'fuf#makePathItem(fnamemodify(v:val, ":~"), "", 0)')
-    if len(g:fuf_aroundmrufile_exclude)
-      call filter(s:aroundCache[a:dir], 'v:val.word !~ g:fuf_aroundmrufile_exclude')
+    if len(g:fuf_mrufile_exclude)
+      call filter(s:aroundCache[a:dir], 'v:val.word !~ g:fuf_mrufile_exclude')
     endif
   endif
   return s:aroundCache[a:dir]

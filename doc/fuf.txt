@@ -1359,6 +1359,9 @@ SPECIAL THANKS                                                    *fuf-thanks*
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
 
+4.1.1:
+  - Fixed a bug causing a error in MRU-File mode.
+
 4.1:
   - Added Bookmark-Dir mode.
   - Added Bookmark-File mode and removed Bookmark mode.
