@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -39,7 +39,7 @@ endfunction
 
 "
 function fuf#taggedfile#onInit()
-  call fuf#defineLaunchCommand('FufTaggedFile', s:MODE_NAME, '""')
+  call fuf#defineLaunchCommand('FufTaggedFile', s:MODE_NAME, '""', [])
 endfunction
 
 " }}}1

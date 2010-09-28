@@ -101,6 +101,7 @@ ZIPファイルをランタイムディレクトリに展開します。
         |:FufBookmarkFile| - Bookmark-File モード (|fuf-bookmarkfile-mode|)
         |:FufBookmarkDir|  - Bookmark-Dir モード (|fuf-bookmarkdir-mode|)
         |:FufTag|          - Tag モード (|fuf-tag-mode|)
+        |:FufBufferTag|    - Buffer-Tag モード (|fuf-buffertag-mode|)
         |:FufTaggedFile|   - Tagged-File モード (|fuf-taggedfile-mode|)
         |:FufJumpList|     - Jump-List モード (|fuf-jumplist-mode|)
         |:FufChangeList|   - Change-List モード (|fuf-changelist-mode|)
@@ -213,6 +214,8 @@ MRU-File モード ~
 |BufEnter| と |BufWritePost| で行う処理がパフォーマンス上の問題を起こしうるの
 で、デフォルトでは無効化するモードに指定されています。(|g:fuf_modesDisable|)
 
+See also: |FufMruFileInCwd|
+
                                                              *fuf-mrucmd-mode*
 MRU-Command モード ~
 
@@ -260,6 +263,31 @@ Tag モード ~
 >
         noremap <silent> <C-]> :FufTagWithCursorWord!<CR>
 <
+
+                                                          *fuf-buffertag-mode*
+Buffer-Tag モード ~
+
+このモードはカレントバッファまたは全バッファのタグを選択してその定義へジャンプ
+するインターフェースを提供します。
+
+タグのリストはFuzzyFinderの起動時にその場で作成されるので、前もってtagsファイ
+ルを作成する必要はありません。
+
+|FufBufferTag|はカレントバッファを対象にし、|FufBufferTagAll|は全バッファを対
+象にします。
+
+以下は <C-]> を置き換えるマッピングです:
+>
+        nnoremap <silent> <C-]> :FufBufferTagWithCursorWord!<CR>
+        vnoremap <silent> <C-]> <Esc>:FufBufferTagAllWithSelectedText!<CR>
+<
+または
+>
+        nnoremap <silent> <C-]> :FufBufferTagAllWithCursorWord!<CR>
+        vnoremap <silent> <C-]> <Esc>:FufBufferTagAllWithSelectedText!<CR>
+<
+このモードは taglist.vim (vimscript #273) にインスパイアされました。コードも参
+考にしています。
 
                                                          *fuf-taggedfile-mode*
 Tagged-File モード ~
@@ -677,6 +705,11 @@ See also: |fuf-vimrc-example|
 
         FuzzyFinder 起動後に {pattern} が挿入されます。
 
+                                                            *:FufMruFileInCwd*
+:FufMruFileInCwd [{pattern}]
+        カレントディレクトリ内のファイルのみを対象とする以外は
+        |:FufMruFile|と同じです。
+
                                                                   *:FufMruCmd*
 :FufMruCmd [{pattern}]
         MRU-Command モードを起動します。
@@ -716,6 +749,39 @@ See also: |fuf-vimrc-example|
                                                        *:FufTagWithCursorWord*
 :FufTagWithCursorWord [{pattern}]
         カーソル下の単語を初期パターンとする以外は|:FufTag|と同じです。
+
+                                                               *:FufBufferTag*
+:FufBufferTag[!] [{pattern}]
+        Buffer-Tag モードを起動します。
+
+        ! 修飾子を付けて実行した場合、あいまい検索ではなく部分一致検索を行うよ
+        うになります。
+
+        FuzzyFinder 起動後に {pattern} が挿入されます。
+
+                                                            *:FufBufferTagAll*
+:FufBufferTagAll[!] [{pattern}]
+        カレントバッファだけでなく他の全てのバッファからもタグを集める以外は
+        |:FufBufferTag|と同じです。
+
+                                                 *:FufBufferTagWithCursorWord*
+:FufBufferTagWithCursorWord[!] [{pattern}]
+        カーソル下の単語を初期パターンとする以外は|:FufBufferTag|と同じです。
+
+                                              *:FufBufferTagAllWithCursorWord*
+:FufBufferTagAllWithCursorWord[!] [{pattern}]
+        カーソル下の単語を初期パターンとする以外は|:FufBufferTagAll|と同じです
+        。
+
+                                               *:FufBufferTagWithSelectedText*
+:FufBufferTagWithSelectedText[!] [{pattern}]
+        最後に選択したテキストを初期パターンとする以外は|:FufBufferTag|と同じ
+        です。
+
+                                            *:FufBufferTagAllWithSelectedText*
+:FufBufferTagAllWithSelectedText[!] [{pattern}]
+        最後に選択したテキストを初期パターンとする以外は|:FufBufferTagAll|と同
+        じです。
 
                                                               *:FufTaggedFile*
 :FufTaggedFile [{pattern}]
@@ -1097,7 +1163,7 @@ MRU-Cmd モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                  *g:fuf_mrucmd_switchOrder*  >
-  let g:fuf_mrucmd_switchOrder = 70
+  let g:fuf_mrucmd_switchOrder = 60
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1121,7 +1187,7 @@ Bookmark-File モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                *g:fuf_bookmarkfile_switchOrder*  >
-  let g:fuf_bookmarkfile_switchOrder = 80
+  let g:fuf_bookmarkfile_switchOrder = 70
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1146,7 +1212,7 @@ Bookmark-Dir モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                *g:fuf_bookmarkdir_switchOrder*  >
-  let g:fuf_bookmarkdir_switchOrder = 90
+  let g:fuf_bookmarkdir_switchOrder = 80
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
@@ -1165,10 +1231,29 @@ Tag モード用 ~
         プロンプト文字列。"[]" はインジケータに置換されます。
 
                                                     *g:fuf_tag_switchOrder*  >
-  let g:fuf_tag_switchOrder = 100
+  let g:fuf_tag_switchOrder = 90
 <
         次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
         には切り替えません。
+
+                                              *fuf-options-for-buffertag-mode*
+For Buffer-Tag モード用 ~
+
+                                                   *g:fuf_buffertag_prompt*  >
+  let g:fuf_buffertag_prompt = '>Buffer-Tag[]>'
+<
+        プロンプト文字列。"[]" はインジケータに置換されます。
+
+                                              *g:fuf_buffertag_switchOrder*  >
+  let g:fuf_buffertag_switchOrder = 100
+<
+        次/前のモードに切り替えるときの、モードの順位です。負数ならこのモード
+        には切り替えません。
+
+                                                *g:fuf_buffertag_ctagsPath*  >
+  let g:fuf_buffertag_ctagsPath = 'ctags'
+<
+        Ctagsの実行ファイルのパス
 
                                              *fuf-options-for-taggedfile-mode*
 Tagged-File モード用 ~
@@ -1260,12 +1345,8 @@ vimrc の例                                                 *fuf-vimrc-example*
 
 >
   let g:fuf_modesDisable = []
-  let g:fuf_abbrevMap = {
-        \   '^vr:' : map(filter(split(&runtimepath, ','), 'v:val !~ "after$"'), 'v:val . ''/**/'''),
-        \   '^m0:' : [ '/mnt/d/0/', '/mnt/j/0/' ],
-        \ }
-  let g:fuf_mrufile_maxItem = 500
-  let g:fuf_mrucmd_maxItem = 500
+  let g:fuf_mrufile_maxItem = 400
+  let g:fuf_mrucmd_maxItem = 400
   nnoremap <silent> sj     :FufBuffer<CR>
   nnoremap <silent> sk     :FufFileWithCurrentBufferDir<CR>
   nnoremap <silent> sK     :FufFileWithFullCwd<CR>
@@ -1277,6 +1358,7 @@ vimrc の例                                                 *fuf-vimrc-example*
   nnoremap <silent> sD     :FufDirWithFullCwd<CR>
   nnoremap <silent> s<C-d> :FufDir<CR>
   nnoremap <silent> sn     :FufMruFile<CR>
+  nnoremap <silent> sN     :FufMruFileInCwd<CR>
   nnoremap <silent> sm     :FufMruCmd<CR>
   nnoremap <silent> su     :FufBookmarkFile<CR>
   nnoremap <silent> s<C-u> :FufBookmarkFileAdd<CR>
@@ -1286,6 +1368,13 @@ vimrc の例                                                 *fuf-vimrc-example*
   nnoremap <silent> st     :FufTag<CR>
   nnoremap <silent> sT     :FufTag!<CR>
   noremap  <silent> s]     :FufTagWithCursorWord!<CR>
+  nnoremap <silent> s,     :FufBufferTag<CR>
+  nnoremap <silent> s<     :FufBufferTag!<CR>
+  vnoremap <silent> s,     <Esc>:FufBufferTagWithSelectedText!<CR>
+  nnoremap <silent> s.     :FufBufferTagAll<CR>
+  nnoremap <silent> s>     :FufBufferTagAll!<CR>
+  vnoremap <silent> s.     <Esc>:FufBufferTagAllWithSelectedText!<CR>
+  nnoremap <silent> s}     :FufBufferTagAllWithCursorWord!<CR>
   nnoremap <silent> sg     :FufTaggedFile<CR>
   nnoremap <silent> sG     :FufTaggedFile!<CR>
   nnoremap <silent> so     :FufJumpList<CR>

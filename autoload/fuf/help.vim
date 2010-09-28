@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -39,8 +39,8 @@ endfunction
 
 "
 function fuf#help#onInit()
-  call fuf#defineLaunchCommand('FufHelp'              , s:MODE_NAME, '""')
-  call fuf#defineLaunchCommand('FufHelpWithCursorWord', s:MODE_NAME, 'expand(''<cword>'')')
+  call fuf#defineLaunchCommand('FufHelp'              , s:MODE_NAME, '""', [])
+  call fuf#defineLaunchCommand('FufHelpWithCursorWord', s:MODE_NAME, 'expand(''<cword>'')', [])
 endfunction
 
 " }}}1

@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -38,7 +38,7 @@ endfunction
 
 "
 function fuf#mrucmd#onInit()
-  call fuf#defineLaunchCommand('FufMruCmd', s:MODE_NAME, '""')
+  call fuf#defineLaunchCommand('FufMruCmd', s:MODE_NAME, '""', [])
 endfunction
 
 "

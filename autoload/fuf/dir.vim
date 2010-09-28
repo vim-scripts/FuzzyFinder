@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -39,9 +39,9 @@ endfunction
 
 "
 function fuf#dir#onInit()
-  call fuf#defineLaunchCommand('FufDir'                    , s:MODE_NAME, '""')
-  call fuf#defineLaunchCommand('FufDirWithFullCwd'         , s:MODE_NAME, 'fnamemodify(getcwd(), '':p'')')
-  call fuf#defineLaunchCommand('FufDirWithCurrentBufferDir', s:MODE_NAME, 'expand(''%:~:.'')[:-1-len(expand(''%:~:.:t''))]')
+  call fuf#defineLaunchCommand('FufDir'                    , s:MODE_NAME, '""', [])
+  call fuf#defineLaunchCommand('FufDirWithFullCwd'         , s:MODE_NAME, 'fnamemodify(getcwd(), '':p'')', [])
+  call fuf#defineLaunchCommand('FufDirWithCurrentBufferDir', s:MODE_NAME, 'expand(''%:~:.'')[:-1-len(expand(''%:~:.:t''))]', [])
 endfunction
 
 " }}}1

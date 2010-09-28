@@ -6,7 +6,7 @@
 " LOAD GUARD {{{1
 
 try
-  if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+  if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 101, [])
     finish
   endif
 catch /E117/
@@ -73,24 +73,27 @@ function s:initialize()
   call l9#defineVariableDefault('g:fuf_mrufile_maxItem'    , 200)
   call l9#defineVariableDefault('g:fuf_mrufile_maxItemDir' , 50)
   call l9#defineVariableDefault('g:fuf_mrufile_keyExpand'  , '<C-]>')
-  call l9#defineVariableDefault('g:fuf_mrufile_searchAroundLevel', -1) " private option
   "---------------------------------------------------------------------------
   call l9#defineVariableDefault('g:fuf_mrucmd_prompt'     , '>MRU-Cmd[]>')
-  call l9#defineVariableDefault('g:fuf_mrucmd_switchOrder', 70)
+  call l9#defineVariableDefault('g:fuf_mrucmd_switchOrder', 60)
   call l9#defineVariableDefault('g:fuf_mrucmd_exclude'    , '^$')
   call l9#defineVariableDefault('g:fuf_mrucmd_maxItem'    , 200)
   "---------------------------------------------------------------------------
-  call l9#defineVariableDefault('g:fuf_bookmarkfile_prompt'     , '>BookmarkFile[]>')
-  call l9#defineVariableDefault('g:fuf_bookmarkfile_switchOrder', 80)
+  call l9#defineVariableDefault('g:fuf_bookmarkfile_prompt'     , '>Bookmark-File[]>')
+  call l9#defineVariableDefault('g:fuf_bookmarkfile_switchOrder', 70)
   call l9#defineVariableDefault('g:fuf_bookmarkfile_searchRange', 400)
   call l9#defineVariableDefault('g:fuf_bookmarkfile_keyDelete'  , '<C-]>')
   "---------------------------------------------------------------------------
-  call l9#defineVariableDefault('g:fuf_bookmarkdir_prompt'     , '>BookmarkDir[]>')
-  call l9#defineVariableDefault('g:fuf_bookmarkdir_switchOrder', 90)
+  call l9#defineVariableDefault('g:fuf_bookmarkdir_prompt'     , '>Bookmark-Dir[]>')
+  call l9#defineVariableDefault('g:fuf_bookmarkdir_switchOrder', 80)
   call l9#defineVariableDefault('g:fuf_bookmarkdir_keyDelete'  , '<C-]>')
   "---------------------------------------------------------------------------
   call l9#defineVariableDefault('g:fuf_tag_prompt'     , '>Tag[]>')
-  call l9#defineVariableDefault('g:fuf_tag_switchOrder', 100)
+  call l9#defineVariableDefault('g:fuf_tag_switchOrder', 90)
+  "---------------------------------------------------------------------------
+  call l9#defineVariableDefault('g:fuf_buffertag_prompt'     , '>Buffer-Tag[]>')
+  call l9#defineVariableDefault('g:fuf_buffertag_switchOrder', 100)
+  call l9#defineVariableDefault('g:fuf_buffertag_ctagsPath'  , 'ctags')
   "---------------------------------------------------------------------------
   call l9#defineVariableDefault('g:fuf_taggedfile_prompt'     , '>Tagged-File[]>')
   call l9#defineVariableDefault('g:fuf_taggedfile_switchOrder', 110)
@@ -122,6 +125,7 @@ function s:initialize()
   call fuf#addMode('bookmarkfile')
   call fuf#addMode('bookmarkdir')
   call fuf#addMode('tag')
+  call fuf#addMode('buffertag')
   call fuf#addMode('taggedfile')
   call fuf#addMode('jumplist')
   call fuf#addMode('changelist')

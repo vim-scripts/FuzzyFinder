@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -39,7 +39,7 @@ endfunction
 
 "
 function fuf#coveragefile#onInit()
-  call fuf#defineLaunchCommand('FufCoverageFile', s:MODE_NAME, '""')
+  call fuf#defineLaunchCommand('FufCoverageFile', s:MODE_NAME, '""', [])
   command! -bang -narg=0        FufCoverageFileRegister call s:registerCoverage()
   command! -bang -narg=?        FufCoverageFileChange call s:changeCoverage(<q-args>)
 endfunction
@@ -122,7 +122,7 @@ function s:changeCoverage(name)
   endif
   call fuf#setOneTimeVariables(['g:fuf_coveragefile_globPatterns',
         \                       coverages[0].patterns])
-  call feedkeys(":FufCoverageFile\<CR>", 'n')
+  FufCoverageFile
 endfunction
 
 " }}}1

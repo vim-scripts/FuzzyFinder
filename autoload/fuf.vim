@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -15,7 +15,12 @@ endif
 
 "
 function fuf#countModifiedFiles(files, time)
-  return len(filter(copy(a:files), 'getftime(v:val) > a:time'))
+  return len(filter(copy(a:files), 'getftime(expand(v:val)) > a:time'))
+endfunction
+
+"
+function fuf#countModifiedBuffers(buffers, time)
+  return len(filter(copy(a:buffers), 'getftime(expand(bufname(v:val))) > a:time'))
 endfunction
 
 "
@@ -317,9 +322,15 @@ function fuf#getModeNames()
 endfunction
 
 "
-function fuf#defineLaunchCommand(CmdName, modeName, prefixInitialPattern)
-  execute printf('command! -bang -narg=? %s call fuf#launch(%s, %s . <q-args>, len(<q-bang>))',
-        \        a:CmdName, string(a:modeName), a:prefixInitialPattern)
+function fuf#defineLaunchCommand(CmdName, modeName, prefixInitialPattern, tempVars)
+  if empty(a:tempVars)
+    let preCmd = ''
+  else
+    let preCmd = printf('call l9#tempvariables#setList(%s, %s) | ',
+          \             string(s:TEMP_VARIABLES_GROUP), string(a:tempVars))
+  endif
+  execute printf('command! -bang -narg=? %s %s call fuf#launch(%s, %s . <q-args>, len(<q-bang>))',
+        \        a:CmdName, preCmd, string(a:modeName), a:prefixInitialPattern)
 endfunction
 
 "
@@ -854,7 +865,8 @@ endfunction
 "
 function s:handlerBase.onInsertLeave()
   unlet s:runningHandler
-  call l9#tempvariables#swap(s:TEMP_VARIABLES_GROUP)
+  let tempVars = l9#tempvariables#getList(s:TEMP_VARIABLES_GROUP)
+  call l9#tempvariables#end(s:TEMP_VARIABLES_GROUP)
   call s:deactivateFufBuffer()
   call fuf#saveDataFile(self.getModeName(), 'stats', self.stats)
   execute self.windowRestoringCommand
@@ -865,10 +877,8 @@ function s:handlerBase.onInsertLeave()
   endif
   call self.onModeLeavePost(fOpen)
   if exists('self.reservedMode')
-    call l9#tempvariables#swap(s:TEMP_VARIABLES_GROUP)
+    call l9#tempvariables#setList(s:TEMP_VARIABLES_GROUP, tempVars)
     call fuf#launch(self.reservedMode, self.lastPattern, self.partialMatching)
-  else
-    call l9#tempvariables#end(s:TEMP_VARIABLES_GROUP)
   endif
 endfunction
 

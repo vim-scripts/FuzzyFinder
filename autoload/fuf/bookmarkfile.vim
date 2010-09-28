@@ -4,7 +4,7 @@
 "=============================================================================
 " LOAD GUARD {{{1
 
-if !l9#guardScriptLoading(expand('<sfile>:p'), 702, 100)
+if !l9#guardScriptLoading(expand('<sfile>:p'), 0, 0, [])
   finish
 endif
 
@@ -38,7 +38,7 @@ endfunction
 
 "
 function fuf#bookmarkfile#onInit()
-  call fuf#defineLaunchCommand('FufBookmarkFile', s:MODE_NAME, '""')
+  call fuf#defineLaunchCommand('FufBookmarkFile', s:MODE_NAME, '""', [])
   command! -bang -narg=?        FufBookmarkFileAdd               call s:bookmarkHere(<q-args>)
   command! -bang -narg=0 -range FufBookmarkFileAddAsSelectedText call s:bookmarkHere(l9#getSelectedText())
 endfunction
