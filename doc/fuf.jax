@@ -279,12 +279,12 @@ Buffer-Tag モード ~
 以下は <C-]> を置き換えるマッピングです:
 >
         nnoremap <silent> <C-]> :FufBufferTagWithCursorWord!<CR>
-        vnoremap <silent> <C-]> <Esc>:FufBufferTagAllWithSelectedText!<CR>
+        vnoremap <silent> <C-]> :FufBufferTagAllWithSelectedText!<CR>
 <
 または
 >
         nnoremap <silent> <C-]> :FufBufferTagAllWithCursorWord!<CR>
-        vnoremap <silent> <C-]> <Esc>:FufBufferTagAllWithSelectedText!<CR>
+        vnoremap <silent> <C-]> :FufBufferTagAllWithSelectedText!<CR>
 <
 このモードは taglist.vim (vimscript #273) にインスパイアされました。コードも参
 考にしています。
@@ -1367,14 +1367,17 @@ vimrc の例                                                 *fuf-vimrc-example*
   nnoremap <silent> s<C-i> :FufBookmarkDirAdd<CR>
   nnoremap <silent> st     :FufTag<CR>
   nnoremap <silent> sT     :FufTag!<CR>
-  noremap  <silent> s]     :FufTagWithCursorWord!<CR>
+  nnoremap <silent> s<C-]> :FufTagWithCursorWord!<CR>
   nnoremap <silent> s,     :FufBufferTag<CR>
   nnoremap <silent> s<     :FufBufferTag!<CR>
-  vnoremap <silent> s,     <Esc>:FufBufferTagWithSelectedText!<CR>
+  vnoremap <silent> s,     :FufBufferTagWithSelectedText!<CR>
+  vnoremap <silent> s<     :FufBufferTagWithSelectedText<CR>
+  nnoremap <silent> s}     :FufBufferTagWithCursorWord!<CR>
   nnoremap <silent> s.     :FufBufferTagAll<CR>
   nnoremap <silent> s>     :FufBufferTagAll!<CR>
-  vnoremap <silent> s.     <Esc>:FufBufferTagAllWithSelectedText!<CR>
-  nnoremap <silent> s}     :FufBufferTagAllWithCursorWord!<CR>
+  vnoremap <silent> s.     :FufBufferTagAllWithSelectedText!<CR>
+  vnoremap <silent> s>     :FufBufferTagAllWithSelectedText<CR>
+  nnoremap <silent> s]     :FufBufferTagAllWithCursorWord!<CR>
   nnoremap <silent> sg     :FufTaggedFile<CR>
   nnoremap <silent> sG     :FufTaggedFile!<CR>
   nnoremap <silent> so     :FufJumpList<CR>

@@ -40,6 +40,7 @@ endfunction
 "
 function fuf#coveragefile#onInit()
   call fuf#defineLaunchCommand('FufCoverageFile', s:MODE_NAME, '""', [])
+  call l9#defineVariableDefault('g:fuf_coveragefile_name', '') " private option
   command! -bang -narg=0        FufCoverageFileRegister call s:registerCoverage()
   command! -bang -narg=?        FufCoverageFileChange call s:changeCoverage(<q-args>)
 endfunction
@@ -56,8 +57,8 @@ function s:enumItems()
         \         g:fuf_coveragefile_globPatterns], "\n")
   if !exists('s:cache[key]')
     let s:cache[key] = l9#concat(map(copy(g:fuf_coveragefile_globPatterns),
-          \                          'split(glob(v:val), "\n")'))
-    call filter(s:cache[key], 'filereadable(v:val)')
+          \                          'fuf#glob(v:val)'))
+    call filter(s:cache[key], 'filereadable(v:val)') " filter out directories
     call map(s:cache[key], 'fuf#makePathItem(fnamemodify(v:val, ":~:."), "", 0)')
     if len(g:fuf_coveragefile_exclude)
       call filter(s:cache[key], 'v:val.word !~ g:fuf_coveragefile_exclude')
@@ -120,8 +121,10 @@ function s:changeCoverage(name)
       call fuf#echoError('Coverage not found: ' . name)
     return
   endif
-  call fuf#setOneTimeVariables(['g:fuf_coveragefile_globPatterns',
-        \                       coverages[0].patterns])
+  call fuf#setOneTimeVariables(
+        \   ['g:fuf_coveragefile_globPatterns', coverages[0].patterns],
+        \   ['g:fuf_coveragefile_name'        , a:name]
+        \ )
   FufCoverageFile
 endfunction
 
@@ -138,8 +141,10 @@ endfunction
 
 "
 function s:handler.getPrompt()
+  let nameString = (empty(g:fuf_coveragefile_name) ? ''
+        \           : '[' . g:fuf_coveragefile_name . ']')
   return fuf#formatPrompt(g:fuf_coveragefile_prompt, self.partialMatching,
-        \                 string(g:fuf_coveragefile_globPatterns))
+        \                 nameString)
 endfunction
 
 "
@@ -181,8 +186,8 @@ endfunction
 function s:handler.onModeEnterPost()
   " NOTE: Comparing filenames is faster than bufnr('^' . fname . '$')
   let bufNamePrev = fnamemodify(bufname(self.bufNrPrev), ':~:.')
-  let self.items = s:enumItems()
-  call filter(self.items, '!empty(v:val) && v:val.word !=# bufNamePrev')
+  let self.items = copy(s:enumItems())
+  call filter(self.items, 'v:val.word !=# bufNamePrev')
 endfunction
 
 "

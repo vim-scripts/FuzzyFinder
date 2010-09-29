@@ -126,8 +126,8 @@ endfunction
 function s:listAroundFiles(dir)
   if !exists('s:aroundCache[a:dir]')
     let s:aroundCache[a:dir] = [a:dir] +
-          \              split(glob(a:dir . l9#getPathSeparator() . "*" ), "\n") +
-          \              split(glob(a:dir . l9#getPathSeparator() . ".*"), "\n")
+          \              fuf#glob(l9#concatPaths([a:dir, '*' ])) +
+          \              fuf#glob(l9#concatPaths([a:dir, '.*']))
     call filter(s:aroundCache[a:dir], 'filereadable(v:val)')
     call map(s:aroundCache[a:dir], 'fuf#makePathItem(fnamemodify(v:val, ":~"), "", 0)')
     if len(g:fuf_mrufile_exclude)
