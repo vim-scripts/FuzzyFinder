@@ -27,11 +27,6 @@ function fuf#countModifiedFiles(files, time)
 endfunction
 
 "
-function fuf#countModifiedBuffers(buffers, time)
-  return len(filter(copy(a:buffers), 'getftime(expand(bufname(v:val))) > a:time'))
-endfunction
-
-"
 function fuf#getCurrentTagFiles()
   return sort(filter(map(tagfiles(), 'fnamemodify(v:val, '':p'')'), 'filereadable(v:val)'))
 endfunction
@@ -497,7 +492,7 @@ endfunction
 "=============================================================================
 " LOCAL FUNCTIONS/VARIABLES {{{1
 
-let s:TEMP_VARIABLES_GROUP = "FuzzyFinder"
+let s:TEMP_VARIABLES_GROUP = expand('<sfile>:p')
 let s:ABBR_SNIP_MASK = '...'
 let s:OPEN_TYPE_CURRENT = 1
 let s:OPEN_TYPE_SPLIT   = 2

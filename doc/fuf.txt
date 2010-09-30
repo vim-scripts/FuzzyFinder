@@ -78,9 +78,9 @@ You should place the files as follows:
 <
 If you are disgusted to make your runtime directory confused with a lot of
 plugins, put each of the plugins into a directory individually and just add
-the directory path to 'runtimepath'. It's easy to uninstall the plugin.
+the directory path to 'runtimepath'. It's easy to uninstall plugins.
 
-Then update your help tags files to enable the help for this plugin. See
+Then update your help tags files to enable help for this plugin. See
 |add-local-help| for details.
 
 Requirements: ~
@@ -1450,6 +1450,9 @@ SPECIAL THANKS                                                    *fuf-thanks*
 
 ==============================================================================
 CHANGELOG                                                      *fuf-changelog*
+
+4.2.2:
+  - Fixed a bug that unloaded buffers weren't covered by FufBufferTagAll.
 
 4.2.1:
   - Improved response of Buffer-Tag mode.

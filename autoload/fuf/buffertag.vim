@@ -116,8 +116,31 @@ function s:parseTagLine(line)
 endfunction
 
 "
+let s:TEMP_VARIABLES_GROUP = expand('<sfile>:p')
+
+"
+function s:getFileType(bufNr)
+  let ft = getbufvar(a:bufNr, '&filetype')
+  if !empty(ft) || bufloaded(a:bufNr)
+    return ft
+  endif
+  let ft = getbufvar(a:bufNr, 'fuf_buffertag_filetype')
+  if !empty(ft)
+    return ft
+  endif
+  call l9#tempvariables#set(s:TEMP_VARIABLES_GROUP, '&eventignore', 'FileType')
+  call l9#tempvariables#set(s:TEMP_VARIABLES_GROUP, '&filetype', &filetype)
+  " from taglist.vim
+  execute 'doautocmd filetypedetect BufRead ' . bufname(a:bufNr)
+  let ft = &filetype
+  call l9#tempvariables#end(s:TEMP_VARIABLES_GROUP)
+  call setbufvar(a:bufNr, 'fuf_buffertag_filetype', ft)
+  return ft
+endfunction
+
+"
 function s:makeCtagsCmd(bufNr)
-  let ft = getbufvar(a:bufNr, "&filetype")
+  let ft = s:getFileType(a:bufNr)
   if !exists('g:fuf_buffertag__{ft}')
     return ''
   endif
@@ -165,8 +188,9 @@ endfunction
 "
 function s:getTagData(bufNrs)
   let key = join([0] + sort(copy(a:bufNrs)), "\n")
+  let bufNames = map(copy(a:bufNrs), 'bufname(v:val)')
   if !exists('s:tagDataCache[key]') ||
-        \ fuf#countModifiedBuffers(a:bufNrs, s:tagDataCache[key].time) > 0
+        \ fuf#countModifiedFiles(bufNames, s:tagDataCache[key].time) > 0
     let itemMap = {}
     for item in l9#concat(map(copy(a:bufNrs), 's:getTagItems(v:val)'))
       if !exists('itemMap[item.tag]')
