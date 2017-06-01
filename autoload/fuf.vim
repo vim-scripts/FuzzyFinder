@@ -706,6 +706,11 @@ let s:FUF_BUF_NAME = '[fuf]'
 
 "
 function s:activateFufBuffer()
+  " Save the last window number so we can switch back to it later (otherwise,
+  " at least with more recent versions of Vim, we end up with the top left
+  " window focused)
+  let s:fuf_buffer_last_winnr = winnr()
+
   " lcd . : To avoid the strange behavior that unnamed buffer changes its cwd
   "         if 'autochdir' was set on.
   lcd .
@@ -733,6 +738,7 @@ function s:deactivateFufBuffer()
     AutoComplPopUnlock
   endif
   call l9#tempbuffer#close(s:FUF_BUF_NAME)
+  exec s:fuf_buffer_last_winnr . "wincmd w"
 endfunction
 
 " }}}1
