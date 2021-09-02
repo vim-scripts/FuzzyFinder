@@ -142,10 +142,10 @@ function fuf#openBuffer(bufNr, mode, reuse)
     return
   endif
   execute printf({
-        \   s:OPEN_TYPE_CURRENT : '%sbuffer'          ,
-        \   s:OPEN_TYPE_SPLIT   : '%ssbuffer'         ,
-        \   s:OPEN_TYPE_VSPLIT  : 'vertical %ssbuffer',
-        \   s:OPEN_TYPE_TAB     : 'tab %ssbuffer'     ,
+        \   s:OPEN_TYPE_CURRENT : '%sbuffer'         ,
+        \   s:OPEN_TYPE_SPLIT   : 'split | %sbuffer' ,
+        \   s:OPEN_TYPE_VSPLIT  : 'vsplit | %sbuffer',
+        \   s:OPEN_TYPE_TAB     : 'tabe | %sbuffer'  ,
         \ }[a:mode], a:bufNr)
 endfunction
 
