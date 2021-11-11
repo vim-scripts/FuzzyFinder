@@ -141,6 +141,9 @@ function fuf#openBuffer(bufNr, mode, reuse)
         \         l9#moveToBufferWindowInOtherTabpage(a:bufNr)))
     return
   endif
+  if exists('s:currentWin') && type(s:currentWin) == v:t_number
+    exec s:currentWin . 'wincmd w'
+  endif
   execute printf({
         \   s:OPEN_TYPE_CURRENT : '%sbuffer'         ,
         \   s:OPEN_TYPE_SPLIT   : 'split | %sbuffer' ,
@@ -378,6 +381,7 @@ function fuf#launch(modeName, initialPattern, partialMatching)
   endif
   call l9#tempvariables#setList(s:TEMP_VARIABLES_GROUP, s:oneTimeVariables)
   let s:oneTimeVariables = []
+  let s:currentWin = winnr()
   call s:activateFufBuffer()
   augroup FufLocal
     autocmd!
@@ -883,6 +887,9 @@ function s:handlerBase.onInsertLeave()
   if exists('self.reservedMode')
     call l9#tempvariables#setList(s:TEMP_VARIABLES_GROUP, tempVars)
     call fuf#launch(self.reservedMode, self.lastPattern, self.partialMatching)
+  endif
+  if exists('s:currentWin')
+    unlet s:currentWin
   endif
 endfunction
 
