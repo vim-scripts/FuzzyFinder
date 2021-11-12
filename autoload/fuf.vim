@@ -142,10 +142,10 @@ function fuf#openBuffer(bufNr, mode, reuse)
     return
   endif
   execute printf({
-        \   s:OPEN_TYPE_CURRENT : '%sbuffer'          ,
-        \   s:OPEN_TYPE_SPLIT   : '%ssbuffer'         ,
-        \   s:OPEN_TYPE_VSPLIT  : 'vertical %ssbuffer',
-        \   s:OPEN_TYPE_TAB     : 'tab %ssbuffer'     ,
+        \   s:OPEN_TYPE_CURRENT : '%sbuffer'         ,
+        \   s:OPEN_TYPE_SPLIT   : 'split | %sbuffer' ,
+        \   s:OPEN_TYPE_VSPLIT  : 'vsplit | %sbuffer',
+        \   s:OPEN_TYPE_TAB     : 'tabe | %sbuffer'  ,
         \ }[a:mode], a:bufNr)
 endfunction
 
@@ -378,6 +378,7 @@ function fuf#launch(modeName, initialPattern, partialMatching)
   endif
   call l9#tempvariables#setList(s:TEMP_VARIABLES_GROUP, s:oneTimeVariables)
   let s:oneTimeVariables = []
+  let s:currentWin = winnr()
   call s:activateFufBuffer()
   augroup FufLocal
     autocmd!
@@ -874,6 +875,12 @@ function s:handlerBase.onInsertLeave()
   call s:deactivateFufBuffer()
   call fuf#saveDataFile(self.getModeName(), 'stats', self.stats)
   execute self.windowRestoringCommand
+  if exists('s:currentWin') 
+    if type(s:currentWin) == v:t_number
+      exec s:currentWin . 'wincmd w'
+      unlet s:currentWin
+    endif
+  endif
   let fOpen = exists('s:reservedCommand')
   if fOpen
     call self.onOpen(s:reservedCommand[0], s:reservedCommand[1])
