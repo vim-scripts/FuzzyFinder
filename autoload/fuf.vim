@@ -141,9 +141,6 @@ function fuf#openBuffer(bufNr, mode, reuse)
         \         l9#moveToBufferWindowInOtherTabpage(a:bufNr)))
     return
   endif
-  if exists('s:currentWin') && type(s:currentWin) == v:t_number
-    exec s:currentWin . 'wincmd w'
-  endif
   execute printf({
         \   s:OPEN_TYPE_CURRENT : '%sbuffer'         ,
         \   s:OPEN_TYPE_SPLIT   : 'split | %sbuffer' ,
@@ -878,6 +875,12 @@ function s:handlerBase.onInsertLeave()
   call s:deactivateFufBuffer()
   call fuf#saveDataFile(self.getModeName(), 'stats', self.stats)
   execute self.windowRestoringCommand
+  if exists('s:currentWin') 
+    if type(s:currentWin) == v:t_number
+      exec s:currentWin . 'wincmd w'
+      unlet s:currentWin
+    endif
+  endif
   let fOpen = exists('s:reservedCommand')
   if fOpen
     call self.onOpen(s:reservedCommand[0], s:reservedCommand[1])
@@ -887,9 +890,6 @@ function s:handlerBase.onInsertLeave()
   if exists('self.reservedMode')
     call l9#tempvariables#setList(s:TEMP_VARIABLES_GROUP, tempVars)
     call fuf#launch(self.reservedMode, self.lastPattern, self.partialMatching)
-  endif
-  if exists('s:currentWin')
-    unlet s:currentWin
   endif
 endfunction
 
